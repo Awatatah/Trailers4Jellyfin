@@ -1,5 +1,5 @@
 ---
-version: 1.0.1.0
+version: 1.0.2.0
 name: Trailers4Jellyfin
 guid: 7635bf62-6b22-4c4c-9bc7-5d55f0c2bff0
 description: >
@@ -11,8 +11,8 @@ category: General
 owner: robadieNZ
 targetAbi: 10.11.0.0
 changelog:
-  - Fix plugin loading by bundling YoutubeExplode dependencies in release zip
-  - Add plugin logo
+  - Fix release zip always including plugin DLL (v1.0.1.0 zip was accidentally missing it)
+  - Settings page now works after a Jellyfin server restart
 
 dotnetProjects:
   - name: Jellyfin.Plugin.Trailers4Jellyfin

@@ -39,14 +39,16 @@ jobs:
       - name: Package
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
-          # Include the plugin DLL plus all third-party dependencies produced by dotnet publish.
+          # Always include the plugin DLL itself, then all third-party dependencies.
           # Exclude Jellyfin/MediaBrowser framework DLLs — the server already has those loaded.
-          # Jellyfin isolates plugins in their own AssemblyLoadContext, so bundling deps here
-          # is the correct way to ship plugins that have NuGet dependencies.
+          # Note: grep -Ev "/(Jellyfin\." would also exclude our own plugin DLL, so we add it
+          # explicitly and let the dep scan cover everything else.
           DEPS=$(find bin -name "*.dll" \
             | grep -Ev "/(Jellyfin\.|MediaBrowser\.|Microsoft\.|System\.|netstandard|mscorlib)" \
             | tr '\n' ' ')
-          zip -j "trailers4jellyfin_${VERSION}.zip" $DEPS
+          zip -j "trailers4jellyfin_${VERSION}.zip" \
+            bin/Jellyfin.Plugin.Trailers4Jellyfin.dll \
+            $DEPS
 
       - name: Checksum
         id: checksum
