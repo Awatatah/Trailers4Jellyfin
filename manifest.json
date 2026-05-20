@@ -7,6 +7,15 @@
         "overview": "Cinema-style trailers for movies you haven't seen yet",
         "owner": "robadieNZ",
         "imageUrl": "",
-        "versions": []
+        "versions": [
+            {
+                "checksum": "6b883d89b70fdfee3e69bc5fd513bba3",
+                "changelog": "- Initial release\n- Fetches trailers from TMDB Now Playing, Upcoming, Popular, and Top Rated\n- Configurable date range (3 months to all time)\n- Built-in 720p downloader with optional yt-dlp for 1080p\n- Skips movies already in your Jellyfin library\n",
+                "targetAbi": "10.11.0.0",
+                "sourceUrl": "https://github.com/robadieNZ/Trailers4Jellyfin/releases/download/v1.0.0.0/trailers4jellyfin_1.0.0.0.zip",
+                "timestamp": "2026-05-20T21:23:32Z",
+                "version": "1.0.0.0"
+            }
+        ]
     }
 ]
