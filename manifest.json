@@ -9,6 +9,14 @@
         "imageUrl": "https://raw.githubusercontent.com/robadieNZ/Trailers4Jellyfin/main/Jellyfin.Plugin.Trailers4Jellyfin/Images/logo.svg",
         "versions": [
             {
+                "checksum": "eae74c645718391a1b94c8e0acd6cc05",
+                "changelog": "- Fix plugin loading by bundling YoutubeExplode dependencies in release zip\n- Add plugin logo\n",
+                "targetAbi": "10.11.0.0",
+                "sourceUrl": "https://github.com/robadieNZ/Trailers4Jellyfin/releases/download/v1.0.1.0/trailers4jellyfin_1.0.1.0.zip",
+                "timestamp": "2026-05-20T21:46:38Z",
+                "version": "1.0.1.0"
+            },
+            {
                 "checksum": "6b883d89b70fdfee3e69bc5fd513bba3",
                 "changelog": "- Initial release\n- Fetches trailers from TMDB Now Playing, Upcoming, Popular, and Top Rated\n- Configurable date range (3 months to all time)\n- Built-in 720p downloader with optional yt-dlp for 1080p\n- Skips movies already in your Jellyfin library\n",
                 "targetAbi": "10.11.0.0",
