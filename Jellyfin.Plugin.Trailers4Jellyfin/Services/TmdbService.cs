@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -83,8 +84,12 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
 
                 try
                 {
-                    var url = $"{BaseUrl}/movie/{endpoint}?api_key={apiKey}&language=en-US&page={page}";
-                    var json = await client.GetStringAsync(url, ct).ConfigureAwait(false);
+                    var url = $"{BaseUrl}/movie/{endpoint}?language=en-US&page={page}";
+                    using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                    using var response = await client.SendAsync(request, ct).ConfigureAwait(false);
+                    response.EnsureSuccessStatusCode();
+                    var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
                     using var doc = JsonDocument.Parse(json);
 
                     var pageResults = doc.RootElement.GetProperty("results");
@@ -134,10 +139,13 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
             try
             {
                 var client = _httpClientFactory.CreateClient();
-                var url = $"{BaseUrl}/search/movie?query={Uri.EscapeDataString(title)}&api_key={apiKey}";
+                var url = $"{BaseUrl}/search/movie?query={Uri.EscapeDataString(title)}&language=en-US";
                 if (year.HasValue) url += $"&year={year.Value}";
-
-                var json = await client.GetStringAsync(url, ct).ConfigureAwait(false);
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                using var response = await client.SendAsync(request, ct).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+                var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
                 using var doc = JsonDocument.Parse(json);
                 var res = doc.RootElement.GetProperty("results");
                 if (res.GetArrayLength() > 0)
@@ -159,8 +167,12 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
             try
             {
                 var client = _httpClientFactory.CreateClient();
-                var url = $"{BaseUrl}/movie/{tmdbId}/videos?api_key={apiKey}&language=en-US";
-                var json = await client.GetStringAsync(url, ct).ConfigureAwait(false);
+                var url = $"{BaseUrl}/movie/{tmdbId}/videos?language=en-US";
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                using var response = await client.SendAsync(request, ct).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+                var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
                 using var doc = JsonDocument.Parse(json);
 
                 var videos = new List<TmdbVideo>();
