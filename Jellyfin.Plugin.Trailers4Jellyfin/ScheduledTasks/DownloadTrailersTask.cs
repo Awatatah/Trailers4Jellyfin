@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.Trailers4Jellyfin.Services;
-using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
@@ -24,7 +23,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
 
         public string Name => "Download TMDB Trailers";
         public string Key => "Trailers4JellyfinDownload";
-        public string Description => "Downloads movie trailers from TMDB/YouTube to local storage for use with Jellyfin Cinema Mode.";
+        public string Description => "Downloads trailers from TMDB for upcoming and recently released movies not in your library, for use with Jellyfin Cinema Mode.";
         public string Category => "Trailers4Jellyfin";
 
         public DownloadTrailersTask(
@@ -41,7 +40,6 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
 
         public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
         {
-            // Run once daily by default
             yield return new TaskTriggerInfo
             {
                 Type = TaskTriggerInfoType.IntervalTrigger,
@@ -55,154 +53,145 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
 
             if (string.IsNullOrWhiteSpace(config.TmdbApiKey))
             {
-                _logger.LogWarning("|Trailers4Jellyfin| TMDB API key is not configured. Skipping task.");
+                _logger.LogWarning("|Trailers4Jellyfin| No TMDB API key configured. Skipping task.");
                 return;
             }
 
-            if (!config.PlaceAlongsideMovies && string.IsNullOrWhiteSpace(config.DownloadFolder))
+            if (string.IsNullOrWhiteSpace(config.DownloadFolder))
             {
-                _logger.LogWarning("|Trailers4Jellyfin| Download folder is not configured. Skipping task.");
+                _logger.LogWarning("|Trailers4Jellyfin| No download folder configured. Skipping task.");
                 return;
             }
 
-            if (!config.PlaceAlongsideMovies)
+            if (!config.SourceNowPlaying && !config.SourceUpcoming && !config.SourcePopular && !config.SourceTopRated)
             {
-                Directory.CreateDirectory(config.DownloadFolder);
+                _logger.LogWarning("|Trailers4Jellyfin| No TMDB sources selected. Enable at least one source. Skipping task.");
+                return;
             }
 
-            var movies = _libraryManager
-                .GetItemList(new InternalItemsQuery { IncludeItemTypes = new[] { BaseItemKind.Movie }, Recursive = true })
-                .OfType<Movie>()
-                .ToList();
+            Directory.CreateDirectory(config.DownloadFolder);
 
-            _logger.LogInformation("|Trailers4Jellyfin| Processing {Count} movies", movies.Count);
+            progress.Report(5);
 
-            for (int i = 0; i < movies.Count; i++)
+            // Build a set of TMDB IDs already in the Jellyfin library so we can skip them.
+            var libraryTmdbIds = config.SkipMoviesInLibrary
+                ? GetLibraryTmdbIds()
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            _logger.LogInformation("|Trailers4Jellyfin| Library contains {Count} movies with TMDB IDs (will skip these)", libraryTmdbIds.Count);
+
+            progress.Report(10);
+
+            // Fetch candidate movies from the configured TMDB sources.
+            _logger.LogInformation("|Trailers4Jellyfin| Fetching candidates from TMDB...");
+            var candidates = await _tmdbService.GetCandidateMoviesAsync(config, cancellationToken).ConfigureAwait(false);
+            _logger.LogInformation("|Trailers4Jellyfin| Found {Count} candidate movies across all sources", candidates.Count);
+
+            progress.Report(20);
+
+            // Filter: skip movies already in the library.
+            if (config.SkipMoviesInLibrary)
+            {
+                candidates = candidates
+                    .Where(m => !libraryTmdbIds.Contains(m.Id.ToString()))
+                    .ToList();
+                _logger.LogInformation("|Trailers4Jellyfin| {Count} candidates remain after filtering library movies", candidates.Count);
+            }
+
+            if (candidates.Count == 0)
+            {
+                _logger.LogInformation("|Trailers4Jellyfin| No new candidates to download. All done.");
+                progress.Report(100);
+                return;
+            }
+
+            // Download trailers until we hit the configured limit.
+            int downloaded = 0;
+            int processed = 0;
+
+            foreach (var movie in candidates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                progress.Report((double)i / movies.Count * 100);
 
-                var movie = movies[i];
+                if (downloaded >= config.MaxTrailersToDownload)
+                    break;
 
-                if (config.SkipMoviesWithExistingTrailers && HasExistingTrailers(movie, config))
+                double taskProgress = 20 + (80.0 * processed / candidates.Count);
+                progress.Report(taskProgress);
+                processed++;
+
+                var outputPath = BuildOutputPath(movie.Title, movie.Year, config);
+
+                // Skip if file already exists.
+                if (config.SkipAlreadyDownloaded && File.Exists(outputPath))
                 {
-                    _logger.LogDebug("|Trailers4Jellyfin| Skipping '{Name}' – trailers already present", movie.Name);
+                    _logger.LogDebug("|Trailers4Jellyfin| Already downloaded: {Path}", outputPath);
                     continue;
                 }
 
-                await ProcessMovieAsync(movie, config, cancellationToken).ConfigureAwait(false);
+                // Fetch trailer list from TMDB for this movie.
+                var trailers = await _tmdbService.GetTrailersAsync(
+                    movie.Id.ToString(), config.TmdbApiKey, cancellationToken).ConfigureAwait(false);
+
+                if (trailers.Count == 0)
+                {
+                    _logger.LogDebug("|Trailers4Jellyfin| No YouTube trailers on TMDB for '{Title}'", movie.Title);
+                    continue;
+                }
+
+                var trailer = trailers[0];
+                _logger.LogInformation("|Trailers4Jellyfin| Downloading '{Trailer}' for '{Movie}'", trailer.Name, movie.Title);
+
+                var success = await _downloadService.DownloadAsync(
+                    trailer.Key,
+                    outputPath,
+                    config.PreferredVideoHeight,
+                    config.YtDlpPath,
+                    cancellationToken).ConfigureAwait(false);
+
+                if (success)
+                {
+                    downloaded++;
+                    _logger.LogInformation(
+                        "|Trailers4Jellyfin| [{Done}/{Max}] Saved trailer for '{Movie}' → {Path}",
+                        downloaded, config.MaxTrailersToDownload, movie.Title, outputPath);
+                }
             }
 
+            _logger.LogInformation("|Trailers4Jellyfin| Task complete. Downloaded {Count} trailer(s).", downloaded);
             progress.Report(100);
         }
 
-        private async Task ProcessMovieAsync(Movie movie, Configuration.PluginConfiguration config, CancellationToken ct)
+        /// <summary>
+        /// Returns the set of TMDB IDs for all movies currently in the Jellyfin library.
+        /// </summary>
+        private HashSet<string> GetLibraryTmdbIds()
         {
-            try
+            var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var movies = _libraryManager
+                .GetItemList(new InternalItemsQuery { IncludeItemTypes = new[] { BaseItemKind.Movie }, Recursive = true })
+                .OfType<Movie>();
+
+            foreach (var movie in movies)
             {
-                // Prefer the TMDB ID Jellyfin already has in its metadata (avoids an extra API search call).
                 var tmdbId = movie.GetProviderId(MetadataProvider.Tmdb);
-
-                if (string.IsNullOrEmpty(tmdbId))
-                {
-                    _logger.LogDebug("|Trailers4Jellyfin| No TMDB ID in metadata for '{Name}', falling back to search", movie.Name);
-                    tmdbId = await _tmdbService.SearchMovieAsync(movie.Name, movie.ProductionYear, config.TmdbApiKey, ct)
-                        .ConfigureAwait(false);
-                }
-
-                if (string.IsNullOrEmpty(tmdbId))
-                {
-                    _logger.LogWarning("|Trailers4Jellyfin| Could not resolve TMDB ID for '{Name}' ({Year})", movie.Name, movie.ProductionYear);
-                    return;
-                }
-
-                var trailers = await _tmdbService.GetTrailersAsync(tmdbId, config.TmdbApiKey, ct).ConfigureAwait(false);
-                if (trailers.Count == 0)
-                {
-                    _logger.LogDebug("|Trailers4Jellyfin| No trailers found on TMDB for '{Name}'", movie.Name);
-                    return;
-                }
-
-                int downloaded = 0;
-                foreach (var trailer in trailers.Take(config.MaxTrailersPerMovie))
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    var outputPath = BuildOutputPath(movie, downloaded, config);
-
-                    if (File.Exists(outputPath))
-                    {
-                        _logger.LogDebug("|Trailers4Jellyfin| File already exists: {Path}", outputPath);
-                        downloaded++;
-                        continue;
-                    }
-
-                    _logger.LogInformation("|Trailers4Jellyfin| Downloading '{Trailer}' for '{Movie}'", trailer.Name, movie.Name);
-
-                    var success = await _downloadService.DownloadAsync(
-                        trailer.Key,
-                        outputPath,
-                        config.PreferredVideoHeight,
-                        config.YtDlpPath,
-                        ct).ConfigureAwait(false);
-
-                    if (success)
-                    {
-                        downloaded++;
-                        _logger.LogInformation("|Trailers4Jellyfin| Saved trailer for '{Movie}' → {Path}", movie.Name, outputPath);
-                    }
-                }
+                if (!string.IsNullOrEmpty(tmdbId))
+                    ids.Add(tmdbId);
             }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "|Trailers4Jellyfin| Error processing '{Movie}'", movie.Name);
-            }
+
+            return ids;
         }
 
-        private string BuildOutputPath(Movie movie, int index, Configuration.PluginConfiguration config)
+        /// <summary>
+        /// Builds the output file path in the download folder.
+        /// Format: {DownloadFolder}/{Safe Title} ({Year})-trailer.mp4
+        /// </summary>
+        private string BuildOutputPath(string title, int? year, Configuration.PluginConfiguration config)
         {
-            // Sanitise the movie name for use as a filename.
-            var safeName = string.Concat(movie.Name.Split(Path.GetInvalidFileNameChars()));
-            var suffix = index > 0 ? $"-{index}" : string.Empty;
-
-            if (config.PlaceAlongsideMovies)
-            {
-                // Save to {movie directory}/trailers/{name}-trailer.mp4
-                // Jellyfin automatically picks up any video file in a trailers/ subfolder as a LocalTrailer.
-                var movieDir = Path.GetDirectoryName(movie.Path) ?? string.Empty;
-                return Path.Combine(movieDir, "trailers", $"{safeName}-trailer{suffix}.mp4");
-            }
-
-            // Save to a flat dedicated folder: {name} ({year})-trailer.mp4
-            return Path.Combine(
-                config.DownloadFolder,
-                $"{safeName} ({movie.ProductionYear})-trailer{suffix}.mp4");
-        }
-
-        private bool HasExistingTrailers(Movie movie, Configuration.PluginConfiguration config)
-        {
-            // Check if Jellyfin already knows about local trailers for this movie.
-            if (movie.LocalTrailers.Count > 0)
-            {
-                return true;
-            }
-
-            // Also check the filesystem directly in case trailers were downloaded but the library
-            // hasn't been rescanned yet.
-            if (config.PlaceAlongsideMovies && !string.IsNullOrEmpty(movie.Path))
-            {
-                var trailerDir = Path.Combine(Path.GetDirectoryName(movie.Path)!, "trailers");
-                if (Directory.Exists(trailerDir) && Directory.GetFiles(trailerDir).Length > 0)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            var safeName = string.Concat(title.Split(Path.GetInvalidFileNameChars())).Trim();
+            var yearPart = year.HasValue ? $" ({year.Value})" : string.Empty;
+            return Path.Combine(config.DownloadFolder, $"{safeName}{yearPart}-trailer.mp4");
         }
     }
 }
