@@ -37,6 +37,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
 
             var trailerFiles = Directory
                 .EnumerateFiles(config.DownloadFolder, "*-trailer.mp4", SearchOption.TopDirectoryOnly)
+                .Where(f => !Path.GetFileName(f).StartsWith("._", StringComparison.Ordinal))
                 .ToList();
 
             if (trailerFiles.Count == 0)
