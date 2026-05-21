@@ -205,7 +205,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
         {
             var safeName = string.Concat(title.Split(Path.GetInvalidFileNameChars())).Trim();
             var yearPart = year.HasValue ? $" ({year.Value})" : string.Empty;
-            return Path.Combine(config.DownloadFolder, $"{safeName}{yearPart}-trailer.mp4");
+            return Path.Combine(config.DownloadFolder, $"{safeName}{yearPart}.mp4");
         }
     }
 }

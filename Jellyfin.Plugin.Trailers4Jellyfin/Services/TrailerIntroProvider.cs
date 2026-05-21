@@ -47,7 +47,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
                     t.Path != null
                     && t.Path.StartsWith(downloadFolder, StringComparison.OrdinalIgnoreCase)
                     && !Path.GetFileName(t.Path).StartsWith("._", StringComparison.Ordinal)
-                    && t.Path.EndsWith("-trailer.mp4", StringComparison.OrdinalIgnoreCase))
+                    && t.Path.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
             if (trailerItems.Count == 0)
