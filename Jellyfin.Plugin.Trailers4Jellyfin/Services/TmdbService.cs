@@ -221,6 +221,10 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
             return null;
         }
 
+        // All ISO 639-1 codes exposed in the UI. Used to request non-English trailers from TMDB
+        // when no specific language filter is set (TMDB defaults to English-only without this).
+        private const string AllSupportedLanguageCodes = "en,es,fr,de,it,pt,nl,ru,pl,sv,no,da,ja,ko,zh,ar,hi,tr,th,id,null";
+
         public async Task<List<TmdbVideo>> GetTrailersAsync(
             string tmdbId,
             string apiKey,
@@ -229,9 +233,13 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
         {
             try
             {
-                // No language filter on the URL — we want all available trailers so we can
-                // filter by iso_639_1 ourselves based on the user's language preference.
-                var url = $"{BaseUrl}/movie/{tmdbId}/videos";
+                // include_video_language tells TMDB to return videos beyond its en-US default.
+                // Without it, only English trailers are returned regardless of iso_639_1 filtering.
+                var includeLangs = (allowedLanguages != null && allowedLanguages.Count > 0)
+                    ? string.Join(",", allowedLanguages)
+                    : AllSupportedLanguageCodes;
+
+                var url = $"{BaseUrl}/movie/{tmdbId}/videos?include_video_language={includeLangs}";
                 using var request = new HttpRequestMessage(HttpMethod.Get, url);
                 ApplyAuth(request, apiKey);
                 using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);

@@ -1,5 +1,5 @@
 ---
-version: 1.0.15.0
+version: 1.0.16.0
 name: Trailers4Jellyfin
 guid: 7635bf62-6b22-4c4c-9bc7-5d55f0c2bff0
 description: >
@@ -11,7 +11,7 @@ category: General
 owner: robadieNZ
 targetAbi: 10.11.0.0
 changelog:
-  - Fix: add cookies.txt support to fix VideoUnavailableException when YouTube blocks server-side download requests — configure a cookies.txt file (exported from a browser logged into YouTube) in the Advanced plugin settings
+  - Fix: language filter now correctly downloads non-English trailers — TMDB was returning only English videos by default; plugin now passes include_video_language to the videos endpoint
 
 dotnetProjects:
   - name: Jellyfin.Plugin.Trailers4Jellyfin
