@@ -9,14 +9,6 @@
         "imageUrl": "https://raw.githubusercontent.com/Awatatah/Trailers4Jellyfin/main/Jellyfin.Plugin.Trailers4Jellyfin/Images/logo.svg",
         "versions": [
             {
-                "checksum": "26eb664bee78708df9f21258e4b0f0ab",
-                "changelog": "- Add experimental path-based intro mode so trailers can be played directly from the download folder\n- Store TMDB official ratings in trailer sidecar JSON and use them for rating filters in path-based mode\n",
-                "targetAbi": "10.11.0.0",
-                "sourceUrl": "https://github.com/Awatatah/Trailers4Jellyfin/releases/download/v1.0.18.0/trailers4jellyfin_1.0.18.0.zip",
-                "timestamp": "2026-07-15T23:00:10Z",
-                "version": "1.0.18.0"
-            },
-            {
                 "checksum": "2124d4ce6aebebee4e19fdb547883fe0",
                 "changelog": "- Add playback controls for skipping watched trailers per user, controlling trailer frequency, and skipping movies already in progress\n",
                 "targetAbi": "10.11.0.0",
