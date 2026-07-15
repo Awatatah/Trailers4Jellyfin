@@ -284,5 +284,80 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
                 return new List<TmdbVideo>();
             }
         }
+
+        public async Task<string> GetOfficialRatingAsync(
+            string tmdbId,
+            string apiKey,
+            CancellationToken ct)
+        {
+            try
+            {
+                var url = $"{BaseUrl}/movie/{tmdbId}/release_dates";
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                ApplyAuth(request, apiKey);
+                using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+                var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                using var doc = JsonDocument.Parse(json);
+
+                var results = doc.RootElement.GetProperty("results").EnumerateArray().ToList();
+                return GetCertification(results, "US")
+                    ?? GetCertification(results, "GB")
+                    ?? GetFirstCertification(results)
+                    ?? string.Empty;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "|Trailers4Jellyfin| Failed to fetch rating for TMDB ID {Id}", tmdbId);
+                return string.Empty;
+            }
+        }
+
+        private static string? GetCertification(List<JsonElement> results, string countryCode)
+        {
+            foreach (var country in results)
+            {
+                var iso = country.TryGetProperty("iso_3166_1", out var isoEl) ? isoEl.GetString() : null;
+                if (!string.Equals(iso, countryCode, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (!country.TryGetProperty("release_dates", out var releaseDates))
+                    return null;
+
+                foreach (var releaseDate in releaseDates.EnumerateArray())
+                {
+                    var certification = releaseDate.TryGetProperty("certification", out var certEl)
+                        ? certEl.GetString()
+                        : null;
+
+                    if (!string.IsNullOrWhiteSpace(certification))
+                        return certification;
+                }
+            }
+
+            return null;
+        }
+
+        private static string? GetFirstCertification(List<JsonElement> results)
+        {
+            foreach (var country in results)
+            {
+                if (!country.TryGetProperty("release_dates", out var releaseDates))
+                    continue;
+
+                foreach (var releaseDate in releaseDates.EnumerateArray())
+                {
+                    var certification = releaseDate.TryGetProperty("certification", out var certEl)
+                        ? certEl.GetString()
+                        : null;
+
+                    if (!string.IsNullOrWhiteSpace(certification))
+                        return certification;
+                }
+            }
+
+            return null;
+        }
     }
 }

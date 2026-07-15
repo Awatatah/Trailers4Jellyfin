@@ -36,6 +36,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Configuration
         public bool EnableGenreMatching { get; set; } = true;
         public bool SkipWatchedTrailers { get; set; } = true;
         public bool SkipInProgressMovies { get; set; } = true;
+        public bool UsePathBasedIntros { get; set; } = false;
         public int TrailerWatchInterval { get; set; } = 1;
 
         // ── Languages ─────────────────────────────────────────────────────────
