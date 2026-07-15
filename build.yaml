@@ -1,5 +1,5 @@
 ---
-version: 1.0.17.0
+version: 1.0.18.0
 name: Trailers4Jellyfin
 guid: 7635bf62-6b22-4c4c-9bc7-5d55f0c2bff0
 description: >
@@ -11,7 +11,8 @@ category: General
 owner: Awatatah
 targetAbi: 10.11.0.0
 changelog:
-  - Add playback controls for skipping watched trailers per user, controlling trailer frequency, and skipping movies already in progress
+  - Add experimental path-based intro mode so trailers can be played directly from the download folder
+  - Store TMDB official ratings in trailer sidecar JSON and use them for rating filters in path-based mode
 
 dotnetProjects:
   - name: Jellyfin.Plugin.Trailers4Jellyfin
