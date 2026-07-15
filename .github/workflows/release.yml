@@ -77,8 +77,8 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body: |
-            See [CHANGELOG](https://github.com/robadieNZ/Trailers4Jellyfin/blob/main/build.yaml) for details.
+            See [CHANGELOG](https://github.com/Awatatah/Trailers4Jellyfin/blob/main/build.yaml) for details.
 
-            **To install:** Add `https://raw.githubusercontent.com/robadieNZ/Trailers4Jellyfin/main/manifest.json`
+            **To install:** Add `https://raw.githubusercontent.com/Awatatah/Trailers4Jellyfin/main/manifest.json`
             as a plugin repository in Jellyfin → Admin → Plugins → Repositories.
           files: trailers4jellyfin_${{ steps.version.outputs.VERSION }}.zip

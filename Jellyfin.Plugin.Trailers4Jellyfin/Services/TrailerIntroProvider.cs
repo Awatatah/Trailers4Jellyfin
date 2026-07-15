@@ -15,13 +15,18 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
     public class TrailerIntroProvider : IIntroProvider
     {
         private readonly ILibraryManager _libraryManager;
+        private readonly IUserDataManager _userDataManager;
         private readonly ILogger<TrailerIntroProvider> _logger;
 
         public string Name => "Trailers4Jellyfin";
 
-        public TrailerIntroProvider(ILibraryManager libraryManager, ILogger<TrailerIntroProvider> logger)
+        public TrailerIntroProvider(
+            ILibraryManager libraryManager,
+            IUserDataManager userDataManager,
+            ILogger<TrailerIntroProvider> logger)
         {
             _libraryManager = libraryManager;
+            _userDataManager = userDataManager;
             _logger = logger;
         }
 
@@ -37,6 +42,26 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
             // Only inject before movies.
             if (item is not MediaBrowser.Controller.Entities.Movies.Movie)
                 return Task.FromResult(Enumerable.Empty<IntroInfo>());
+
+            var movieUserData = _userDataManager.GetUserData(user, item);
+
+            if (config.SkipInProgressMovies && movieUserData?.PlaybackPositionTicks > 0)
+            {
+                _logger.LogDebug(
+                    "|Trailers4Jellyfin| Skipping intro trailers before in-progress movie '{Movie}'",
+                    item.Name);
+                return Task.FromResult(Enumerable.Empty<IntroInfo>());
+            }
+
+            var trailerWatchInterval = Math.Max(1, config.TrailerWatchInterval);
+            if (trailerWatchInterval > 1 && (movieUserData?.PlayCount ?? 0) % trailerWatchInterval != 0)
+            {
+                _logger.LogDebug(
+                    "|Trailers4Jellyfin| Skipping intro trailers before '{Movie}' until watch interval {Interval} is reached",
+                    item.Name,
+                    trailerWatchInterval);
+                return Task.FromResult(Enumerable.Empty<IntroInfo>());
+            }
 
             // Find trailer items that Jellyfin has scanned from the download folder.
             // The folder must be added as a Jellyfin library so items have a database ID.
@@ -72,9 +97,48 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
                         item.OfficialRating, item.Name);
             }
 
-            List<BaseItem> selected;
+            var selected = config.SkipWatchedTrailers
+                ? SelectUnwatchedTrailers(trailerItems, item, user, config.NumberOfTrailers, config.EnableGenreMatching)
+                : SelectTrailers(trailerItems, item, config.NumberOfTrailers, config.EnableGenreMatching);
 
-            if (config.EnableGenreMatching && item.Genres != null && item.Genres.Length > 0)
+            if (selected.Count == 0 && config.SkipWatchedTrailers)
+            {
+                _logger.LogDebug(
+                    "|Trailers4Jellyfin| No unwatched intro trailers available for '{Movie}'",
+                    item.Name);
+            }
+
+            _logger.LogInformation(
+                "|Trailers4Jellyfin| Queuing {Count} intro trailer(s) before '{Movie}'",
+                selected.Count, item.Name);
+
+            return Task.FromResult(selected.Select(t => new IntroInfo { ItemId = t.Id }));
+        }
+
+        private List<BaseItem> SelectUnwatchedTrailers(
+            List<BaseItem> trailerItems,
+            BaseItem item,
+            User user,
+            int count,
+            bool enableGenreMatching)
+        {
+            var unwatchedTrailerItems = trailerItems
+                .Where(trailer => _userDataManager.GetUserData(user, trailer)?.Played != true)
+                .ToList();
+
+            return SelectTrailers(unwatchedTrailerItems, item, count, enableGenreMatching);
+        }
+
+        private static List<BaseItem> SelectTrailers(
+            List<BaseItem> trailerItems,
+            BaseItem item,
+            int count,
+            bool enableGenreMatching)
+        {
+            if (count <= 0 || trailerItems.Count == 0)
+                return new List<BaseItem>();
+
+            if (enableGenreMatching && item.Genres != null && item.Genres.Length > 0)
             {
                 var movieGenres = new HashSet<string>(item.Genres, StringComparer.OrdinalIgnoreCase);
 
@@ -83,28 +147,20 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
                     .ToList();
 
                 var matched = scored.Where(x => x.score > 0).ToList();
-                var pool = matched.Count >= config.NumberOfTrailers ? matched : scored;
+                var pool = matched.Count >= count ? matched : scored;
 
-                selected = pool
+                return pool
                     .OrderByDescending(x => x.score)
                     .ThenBy(_ => Guid.NewGuid())
-                    .Take(config.NumberOfTrailers)
+                    .Take(count)
                     .Select(x => x.trailer)
                     .ToList();
             }
-            else
-            {
-                selected = trailerItems
-                    .OrderBy(_ => Guid.NewGuid())
-                    .Take(config.NumberOfTrailers)
-                    .ToList();
-            }
 
-            _logger.LogInformation(
-                "|Trailers4Jellyfin| Queuing {Count} intro trailer(s) before '{Movie}'",
-                selected.Count, item.Name);
-
-            return Task.FromResult(selected.Select(t => new IntroInfo { ItemId = t.Id }));
+            return trailerItems
+                .OrderBy(_ => Guid.NewGuid())
+                .Take(count)
+                .ToList();
         }
 
         // Lower number = less mature. Trailers whose severity exceeds the movie's are excluded.

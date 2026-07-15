@@ -15,7 +15,7 @@ import yaml
 
 MANIFEST_FILE = "manifest.json"
 BUILD_YAML = "build.yaml"
-REPO = "robadieNZ/Trailers4Jellyfin"
+REPO = "Awatatah/Trailers4Jellyfin"
 ZIP_PREFIX = "trailers4jellyfin"
 
 

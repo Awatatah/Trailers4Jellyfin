@@ -23,7 +23,7 @@ A Jellyfin plugin that automatically downloads movie trailers from TMDB/YouTube 
 1. In your Jellyfin dashboard go to **Admin → Plugins → Repositories**.
 2. Add a new repository with this URL:
    ```
-  https://raw.githubusercontent.com/robadieNZ/Trailers4Jellyfin/main/manifest.json
+  https://raw.githubusercontent.com/Awatatah/Trailers4Jellyfin/main/manifest.json
    ```
 3. Go to **Catalog**, find **Trailers4Jellyfin** under General, and click Install.
 4. Restart Jellyfin.
@@ -73,7 +73,7 @@ This plugin works with Jellyfin's built-in Cinema Mode setting.
 ## Building from source
 
 ```sh
-git clone https://github.com/robadieNZ/Trailers4Jellyfin
+git clone https://github.com/Awatatah/Trailers4Jellyfin
 cd Trailers4Jellyfin
 dotnet publish --configuration Release --output bin
 ```

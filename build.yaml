@@ -1,5 +1,5 @@
 ---
-version: 1.0.16.0
+version: 1.0.17.0
 name: Trailers4Jellyfin
 guid: 7635bf62-6b22-4c4c-9bc7-5d55f0c2bff0
 description: >
@@ -8,10 +8,10 @@ description: >
   real cinema experience — random trailers before your movies start.
 overview: Cinema-style trailers for movies you haven't seen yet
 category: General
-owner: robadieNZ
+owner: Awatatah
 targetAbi: 10.11.0.0
 changelog:
-  - Fix: language filter now correctly downloads non-English trailers — TMDB was returning only English videos by default; plugin now passes include_video_language to the videos endpoint
+  - Add playback controls for skipping watched trailers per user, controlling trailer frequency, and skipping movies already in progress
 
 dotnetProjects:
   - name: Jellyfin.Plugin.Trailers4Jellyfin
