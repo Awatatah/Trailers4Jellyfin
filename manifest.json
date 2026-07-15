@@ -17,14 +17,6 @@
                 "version": "1.0.18.0"
             },
             {
-                "checksum": "f0c79948c59fa2a63746b3033d068e21",
-                "changelog": "- Add playback controls for skipping watched trailers per user, controlling trailer frequency, and skipping movies already in progress\n",
-                "targetAbi": "10.11.0.0",
-                "sourceUrl": "https://github.com/Awatatah/Trailers4Jellyfin/releases/download/v1.0.17.3/trailers4jellyfin_1.0.17.3.zip",
-                "timestamp": "2026-07-15T22:55:42Z",
-                "version": "1.0.17.3"
-            },
-            {
                 "checksum": "2124d4ce6aebebee4e19fdb547883fe0",
                 "changelog": "- Add playback controls for skipping watched trailers per user, controlling trailer frequency, and skipping movies already in progress\n",
                 "targetAbi": "10.11.0.0",
