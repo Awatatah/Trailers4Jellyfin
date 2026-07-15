@@ -171,13 +171,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
                         "|Trailers4Jellyfin| [{Done}/{Max}] Saved trailer for '{Movie}' → {Path}",
                         downloaded, config.MaxTrailersToDownload, movie.Title, outputPath);
 
-                    var officialRating = await _tmdbService.GetOfficialRatingAsync(
-                        movie.Id.ToString(),
-                        config.TmdbApiKey,
-                        cancellationToken).ConfigureAwait(false);
-
-                    await SaveSidecarAsync(outputPath, movie.GenreIds, genreMap, officialRating, cancellationToken)
-                        .ConfigureAwait(false);
+                    await SaveSidecarAsync(outputPath, movie.GenreIds, genreMap, cancellationToken).ConfigureAwait(false);
                 }
             }
 
@@ -189,16 +183,19 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
             string trailerPath,
             IReadOnlyList<int> genreIds,
             Dictionary<int, string> genreMap,
-            string officialRating,
             CancellationToken ct)
         {
+            if (genreIds == null || genreIds.Count == 0) return;
+
             var genres = genreIds
                 .Select(id => genreMap.TryGetValue(id, out var name) ? name : null)
                 .Where(n => !string.IsNullOrEmpty(n))
                 .ToList();
 
+            if (genres.Count == 0) return;
+
             var sidecarPath = Path.ChangeExtension(trailerPath, ".json");
-            var json = JsonSerializer.Serialize(new { genres, officialRating });
+            var json = JsonSerializer.Serialize(new { genres });
             await File.WriteAllTextAsync(sidecarPath, json, ct).ConfigureAwait(false);
         }
 

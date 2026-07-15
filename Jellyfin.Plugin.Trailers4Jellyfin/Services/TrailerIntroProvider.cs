@@ -63,13 +63,9 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
                 return Task.FromResult(Enumerable.Empty<IntroInfo>());
             }
 
-            var downloadFolder = config.DownloadFolder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-
-            if (config.UsePathBasedIntros)
-                return GetPathBasedIntros(item, config, downloadFolder);
-
             // Find trailer items that Jellyfin has scanned from the download folder.
             // The folder must be added as a Jellyfin library so items have a database ID.
+            var downloadFolder = config.DownloadFolder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             var trailerItems = _libraryManager
                 .GetItemList(new InternalItemsQuery { IncludeItemTypes = new[] { BaseItemKind.Movie }, Recursive = true })
                 .Where(t =>
@@ -117,63 +113,6 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
                 selected.Count, item.Name);
 
             return Task.FromResult(selected.Select(t => new IntroInfo { ItemId = t.Id }));
-        }
-
-        private Task<IEnumerable<IntroInfo>> GetPathBasedIntros(
-            BaseItem item,
-            Configuration.PluginConfiguration config,
-            string downloadFolder)
-        {
-            if (!Directory.Exists(downloadFolder))
-            {
-                _logger.LogDebug(
-                    "|Trailers4Jellyfin| Trailer download folder does not exist: {Folder}",
-                    downloadFolder);
-                return Task.FromResult(Enumerable.Empty<IntroInfo>());
-            }
-
-            if (config.SkipWatchedTrailers)
-            {
-                _logger.LogDebug(
-                    "|Trailers4Jellyfin| Watched-trailer filtering is unavailable when path-based intros are enabled");
-            }
-
-            var trailerPaths = Directory.GetFiles(downloadFolder, "*.mp4")
-                .Where(path => !Path.GetFileName(path).StartsWith("._", StringComparison.Ordinal))
-                .ToList();
-
-            if (trailerPaths.Count == 0)
-            {
-                _logger.LogDebug(
-                    "|Trailers4Jellyfin| No trailer files found under '{Folder}'",
-                    downloadFolder);
-                return Task.FromResult(Enumerable.Empty<IntroInfo>());
-            }
-
-            if (!string.IsNullOrWhiteSpace(item.OfficialRating)
-                && RatingSeverity.TryGetValue(item.OfficialRating, out var movieSeverity))
-            {
-                var filtered = trailerPaths.Where(path => IsRatingAppropriate(path, movieSeverity)).ToList();
-                if (filtered.Count > 0)
-                    trailerPaths = filtered;
-                else
-                    _logger.LogDebug(
-                        "|Trailers4Jellyfin| No path-based trailers at or below rating '{Rating}' for '{Movie}', skipping rating filter",
-                        item.OfficialRating, item.Name);
-            }
-
-            var selected = SelectTrailerPaths(
-                trailerPaths,
-                item,
-                config.NumberOfTrailers,
-                config.EnableGenreMatching);
-
-            _logger.LogInformation(
-                "|Trailers4Jellyfin| Queuing {Count} path-based intro trailer(s) before '{Movie}'",
-                selected.Count,
-                item.Name);
-
-            return Task.FromResult(selected.Select(path => new IntroInfo { Path = path }));
         }
 
         private List<BaseItem> SelectUnwatchedTrailers(
@@ -224,40 +163,6 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
                 .ToList();
         }
 
-        private static List<string> SelectTrailerPaths(
-            List<string> trailerPaths,
-            BaseItem item,
-            int count,
-            bool enableGenreMatching)
-        {
-            if (count <= 0 || trailerPaths.Count == 0)
-                return new List<string>();
-
-            if (enableGenreMatching && item.Genres != null && item.Genres.Length > 0)
-            {
-                var movieGenres = new HashSet<string>(item.Genres, StringComparer.OrdinalIgnoreCase);
-
-                var scored = trailerPaths
-                    .Select(path => (path, score: GetGenreScore(path, movieGenres)))
-                    .ToList();
-
-                var matched = scored.Where(x => x.score > 0).ToList();
-                var pool = matched.Count >= count ? matched : scored;
-
-                return pool
-                    .OrderByDescending(x => x.score)
-                    .ThenBy(_ => Guid.NewGuid())
-                    .Take(count)
-                    .Select(x => x.path)
-                    .ToList();
-            }
-
-            return trailerPaths
-                .OrderBy(_ => Guid.NewGuid())
-                .Take(count)
-                .ToList();
-        }
-
         // Lower number = less mature. Trailers whose severity exceeds the movie's are excluded.
         // Unknown or missing ratings are allowed through (benefit of the doubt).
         private static readonly Dictionary<string, int> RatingSeverity = new(StringComparer.OrdinalIgnoreCase)
@@ -275,13 +180,6 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
         private static bool IsRatingAppropriate(BaseItem trailer, int movieSeverity)
         {
             var rating = trailer.OfficialRating;
-            if (string.IsNullOrWhiteSpace(rating)) return true;
-            return !RatingSeverity.TryGetValue(rating, out var trailerSeverity) || trailerSeverity <= movieSeverity;
-        }
-
-        private static bool IsRatingAppropriate(string trailerPath, int movieSeverity)
-        {
-            var rating = GetOfficialRating(trailerPath);
             if (string.IsNullOrWhiteSpace(rating)) return true;
             return !RatingSeverity.TryGetValue(rating, out var trailerSeverity) || trailerSeverity <= movieSeverity;
         }
@@ -304,24 +202,6 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
             catch
             {
                 return 0;
-            }
-        }
-
-        private static string GetOfficialRating(string trailerPath)
-        {
-            var sidecarPath = Path.ChangeExtension(trailerPath, ".json");
-            if (!File.Exists(sidecarPath)) return string.Empty;
-
-            try
-            {
-                using var doc = JsonDocument.Parse(File.ReadAllText(sidecarPath));
-                return doc.RootElement.TryGetProperty("officialRating", out var ratingEl)
-                    ? ratingEl.GetString() ?? string.Empty
-                    : string.Empty;
-            }
-            catch
-            {
-                return string.Empty;
             }
         }
     }

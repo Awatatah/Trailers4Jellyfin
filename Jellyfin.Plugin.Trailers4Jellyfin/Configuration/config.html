@@ -111,18 +111,6 @@
                                 Avoids showing trailers when a user resumes a partially watched movie.
                             </div>
                         </div>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="use-path-based-intros" />
-                                <span>Use path-based intros (experimental)</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">
-                                Plays trailers directly from the download folder instead of Jellyfin library items.
-                                This may allow hiding the trailer library, but watched-trailer and rating filters
-                                are unavailable in this mode.
-                            </div>
-                        </div>
                     </fieldset>
 
                     <!-- Languages -->
@@ -359,7 +347,6 @@
                     document.getElementById('skip-watched-trailers').checked = config.SkipWatchedTrailers !== false;
                     document.getElementById('trailer-watch-interval').value  = config.TrailerWatchInterval ?? 1;
                     document.getElementById('skip-in-progress-movies').checked = config.SkipInProgressMovies !== false;
-                    document.getElementById('use-path-based-intros').checked = !!config.UsePathBasedIntros;
                     document.getElementById('source-now-playing').checked   = config.SourceNowPlaying !== false;
                     document.getElementById('source-upcoming').checked      = config.SourceUpcoming !== false;
                     document.getElementById('source-popular').checked       = !!config.SourcePopular;
@@ -394,7 +381,6 @@
                     config.SkipWatchedTrailers    = document.getElementById('skip-watched-trailers').checked;
                     config.TrailerWatchInterval   = parseInt(document.getElementById('trailer-watch-interval').value, 10) || 1;
                     config.SkipInProgressMovies   = document.getElementById('skip-in-progress-movies').checked;
-                    config.UsePathBasedIntros     = document.getElementById('use-path-based-intros').checked;
                     config.SourceNowPlaying       = document.getElementById('source-now-playing').checked;
                     config.SourceUpcoming         = document.getElementById('source-upcoming').checked;
                     config.SourcePopular          = document.getElementById('source-popular').checked;
