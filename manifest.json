@@ -9,6 +9,14 @@
         "imageUrl": "https://raw.githubusercontent.com/Awatatah/Trailers4Jellyfin/main/Jellyfin.Plugin.Trailers4Jellyfin/Images/logo.svg",
         "versions": [
             {
+                "checksum": "4e5673d2cfe666f2d0bad0a2b062ec12",
+                "changelog": "- Refactor trailer frequency to use a per-user movie-start cadence instead of per-movie completed watch counts\n- Update the Cinema Mode setting description to explain the first movie, skip next movies, then repeat behavior\n",
+                "targetAbi": "10.11.0.0",
+                "sourceUrl": "https://github.com/Awatatah/Trailers4Jellyfin/releases/download/v1.0.18.3/trailers4jellyfin_1.0.18.3.zip",
+                "timestamp": "2026-07-16T23:47:51Z",
+                "version": "1.0.18.3"
+            },
+            {
                 "checksum": "2dea6dcae7bb57e937da136efca40af0",
                 "changelog": "- Add yt-dlp auto-detection from common install locations and PATH\n- Add optional ffmpeg path setting for yt-dlp audio/video merging\n- Protect movie playback by returning no intros if trailer intro lookup fails\n- Fix release workflow manifest commits so generated manifest updates land on the latest main without rebase conflicts\n",
                 "targetAbi": "10.11.0.0",
