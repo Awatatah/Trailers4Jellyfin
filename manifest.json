@@ -9,6 +9,14 @@
         "imageUrl": "https://raw.githubusercontent.com/Awatatah/Trailers4Jellyfin/main/Jellyfin.Plugin.Trailers4Jellyfin/Images/logo.svg",
         "versions": [
             {
+                "checksum": "b8ba6530dd8b84912b0b300dbb1c2849",
+                "changelog": "- Add trailer cleanup option to delete downloaded trailers when the matching movie is now in the Jellyfin library\n- Store TMDB IDs in trailer sidecar JSON for library-match cleanup\n",
+                "targetAbi": "10.11.0.0",
+                "sourceUrl": "https://github.com/Awatatah/Trailers4Jellyfin/releases/download/v1.0.18.1/trailers4jellyfin_1.0.18.1.zip",
+                "timestamp": "2026-07-16T03:01:27Z",
+                "version": "1.0.18.1"
+            },
+            {
                 "checksum": "2124d4ce6aebebee4e19fdb547883fe0",
                 "changelog": "- Add playback controls for skipping watched trailers per user, controlling trailer frequency, and skipping movies already in progress\n",
                 "targetAbi": "10.11.0.0",
