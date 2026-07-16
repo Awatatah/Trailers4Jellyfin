@@ -1,5 +1,5 @@
 ---
-version: 1.0.18.1
+version: 1.0.18.2
 name: Trailers4Jellyfin
 guid: 7635bf62-6b22-4c4c-9bc7-5d55f0c2bff0
 description: >
@@ -11,8 +11,10 @@ category: General
 owner: Awatatah
 targetAbi: 10.11.0.0
 changelog:
-  - Add trailer cleanup option to delete downloaded trailers when the matching movie is now in the Jellyfin library
-  - Store TMDB IDs in trailer sidecar JSON for library-match cleanup
+  - Add yt-dlp auto-detection from common install locations and PATH
+  - Add optional ffmpeg path setting for yt-dlp audio/video merging
+  - Protect movie playback by returning no intros if trailer intro lookup fails
+  - Fix release workflow manifest commits so generated manifest updates land on the latest main without rebase conflicts
 
 dotnetProjects:
   - name: Jellyfin.Plugin.Trailers4Jellyfin
