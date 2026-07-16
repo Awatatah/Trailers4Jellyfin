@@ -11,6 +11,9 @@ category: General
 owner: Awatatah
 targetAbi: 10.11.0.0
 changelog:
+  - Add yt-dlp auto-detection from common install locations and PATH
+  - Add optional ffmpeg path setting for yt-dlp audio/video merging
+  - Protect movie playback by returning no intros if trailer intro lookup fails
   - Fix release workflow manifest commits so generated manifest updates land on the latest main without rebase conflicts
 
 dotnetProjects:
