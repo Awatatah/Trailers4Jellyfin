@@ -17,6 +17,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
         private readonly ILibraryManager _libraryManager;
         private readonly IUserDataManager _userDataManager;
         private readonly ILogger<TrailerIntroProvider> _logger;
+        private static readonly object TrailerCadenceLock = new();
 
         public string Name => "Trailers4Jellyfin";
 
@@ -54,10 +55,10 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
             }
 
             var trailerWatchInterval = Math.Max(1, config.TrailerWatchInterval);
-            if (trailerWatchInterval > 1 && (movieUserData?.PlayCount ?? 0) % trailerWatchInterval != 0)
+            if (!ShouldShowTrailersForUser(user, trailerWatchInterval))
             {
                 _logger.LogDebug(
-                    "|Trailers4Jellyfin| Skipping intro trailers before '{Movie}' until watch interval {Interval} is reached",
+                    "|Trailers4Jellyfin| Skipping intro trailers before '{Movie}' until user trailer cadence {Interval} is reached",
                     item.Name,
                     trailerWatchInterval);
                 return Task.FromResult(Enumerable.Empty<IntroInfo>());
@@ -113,6 +114,65 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
                 selected.Count, item.Name);
 
             return Task.FromResult(selected.Select(t => new IntroInfo { ItemId = t.Id }));
+        }
+
+        private bool ShouldShowTrailersForUser(User user, int trailerWatchInterval)
+        {
+            if (trailerWatchInterval <= 1)
+                return true;
+
+            lock (TrailerCadenceLock)
+            {
+                var state = LoadTrailerCadenceState();
+                var userId = user.Id.ToString("N");
+                state.TryGetValue(userId, out var previousStarts);
+
+                var currentStart = previousStarts + 1;
+                state[userId] = currentStart;
+                SaveTrailerCadenceState(state);
+
+                var shouldShow = (currentStart - 1) % trailerWatchInterval == 0;
+                _logger.LogDebug(
+                    "|Trailers4Jellyfin| User {UserId} trailer cadence is {CurrentStart}; interval is {Interval}; show trailers: {ShouldShow}",
+                    user.Id,
+                    currentStart,
+                    trailerWatchInterval,
+                    shouldShow);
+
+                return shouldShow;
+            }
+        }
+
+        private Dictionary<string, long> LoadTrailerCadenceState()
+        {
+            var statePath = GetTrailerCadenceStatePath();
+            if (!File.Exists(statePath))
+                return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                var state = JsonSerializer.Deserialize<Dictionary<string, long>>(File.ReadAllText(statePath));
+                return state != null
+                    ? new Dictionary<string, long>(state, StringComparer.OrdinalIgnoreCase)
+                    : new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "|Trailers4Jellyfin| Could not read trailer cadence state. Starting with a fresh counter.");
+                return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
+        private void SaveTrailerCadenceState(Dictionary<string, long> state)
+        {
+            var statePath = GetTrailerCadenceStatePath();
+            Directory.CreateDirectory(Path.GetDirectoryName(statePath)!);
+            File.WriteAllText(statePath, JsonSerializer.Serialize(state));
+        }
+
+        private static string GetTrailerCadenceStatePath()
+        {
+            return Path.Combine(Plugin.Instance.DataFolderPath, "trailer-cadence.json");
         }
 
         private List<BaseItem> SelectUnwatchedTrailers(
