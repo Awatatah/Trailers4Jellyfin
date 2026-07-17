@@ -1,5 +1,5 @@
 ---
-version: 1.0.18.5
+version: 1.0.18.6
 name: Trailers4Jellyfin
 guid: 7635bf62-6b22-4c4c-9bc7-5d55f0c2bff0
 description: >
@@ -11,8 +11,8 @@ category: General
 owner: Awatatah
 targetAbi: 10.11.0.0
 changelog:
-  - Add a keyword exclusion setting for trailer searches
-  - Skip matching TMDB movie titles and trailer names before downloading
+  - Check TMDB movie keywords when applying trailer keyword exclusions
+  - Clarify keyword exclusions apply to movie titles, trailer names, and TMDB keywords
 
 dotnetProjects:
   - name: Jellyfin.Plugin.Trailers4Jellyfin
