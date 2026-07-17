@@ -49,6 +49,9 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Configuration
         /// <summary>When English is selected, skip movies whose TMDB original language is not English.</summary>
         public bool OnlyEnglishOriginalMovies { get; set; } = true;
 
+        /// <summary>Comma-separated keywords. Movies or trailers whose TMDB title/name contains one are skipped.</summary>
+        public string ExcludedTrailerKeywords { get; set; } = string.Empty;
+
         // ── Trailer Rotation ──────────────────────────────────────────────────
 
         /// <summary>Maximum trailers to keep on disk. Oldest are deleted first when exceeded. 0 = unlimited.</summary>
