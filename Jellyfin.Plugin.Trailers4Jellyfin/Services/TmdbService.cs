@@ -14,7 +14,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
 {
     public record TmdbVideo(string Key, string Name, string Language, bool Official, int Size);
 
-    public record TmdbMovieResult(int Id, string Title, string ReleaseDate, IReadOnlyList<int> GenreIds)
+    public record TmdbMovieResult(int Id, string Title, string ReleaseDate, string OriginalLanguage, IReadOnlyList<int> GenreIds)
     {
         public int? Year => DateTime.TryParse(ReleaseDate, out var d) ? d.Year : (int?)null;
     }
@@ -162,6 +162,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
                     {
                         var releaseDate = movie.TryGetProperty("release_date", out var rd) ? rd.GetString() ?? string.Empty : string.Empty;
                         var title = movie.TryGetProperty("title", out var t) ? t.GetString() ?? string.Empty : string.Empty;
+                        var originalLanguage = movie.TryGetProperty("original_language", out var ol) ? ol.GetString() ?? string.Empty : string.Empty;
                         var id = movie.GetProperty("id").GetInt32();
 
                         var genreIds = new List<int>();
@@ -177,7 +178,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
                         }
 
                         anyInRange = true;
-                        results.Add(new TmdbMovieResult(id, title, releaseDate, genreIds));
+                        results.Add(new TmdbMovieResult(id, title, releaseDate, originalLanguage, genreIds));
                     }
 
                     if (page >= totalPages || (releasedAfter.HasValue && !anyInRange))

@@ -1,5 +1,5 @@
 ---
-version: 1.0.18.3
+version: 1.0.18.4
 name: Trailers4Jellyfin
 guid: 7635bf62-6b22-4c4c-9bc7-5d55f0c2bff0
 description: >
@@ -11,8 +11,8 @@ category: General
 owner: Awatatah
 targetAbi: 10.11.0.0
 changelog:
-  - Refactor trailer frequency to use a per-user movie-start cadence instead of per-movie completed watch counts
-  - Update the Cinema Mode setting description to explain the first movie, skip next movies, then repeat behavior
+  - Add an English-original movie filter for English trailer downloads
+  - Skip foreign-language movies when TMDB marks their subtitled trailers as English
 
 dotnetProjects:
   - name: Jellyfin.Plugin.Trailers4Jellyfin

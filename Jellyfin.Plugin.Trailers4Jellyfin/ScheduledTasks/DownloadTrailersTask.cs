@@ -102,6 +102,27 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
             var candidates = await _tmdbService.GetCandidateMoviesAsync(config, cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("|Trailers4Jellyfin| Found {Count} candidate movies across all sources", candidates.Count);
 
+            var shouldFilterToEnglishOriginalMovies = config.OnlyEnglishOriginalMovies
+                && allowedLanguages != null
+                && allowedLanguages.Contains("en");
+            if (shouldFilterToEnglishOriginalMovies)
+            {
+                var beforeLanguageFilter = candidates.Count;
+                candidates = candidates
+                    .Where(m => string.Equals(m.OriginalLanguage, "en", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                _logger.LogInformation(
+                    "|Trailers4Jellyfin| {Count} candidates remain after filtering to English-original movies",
+                    candidates.Count);
+
+                if (beforeLanguageFilter > candidates.Count)
+                {
+                    _logger.LogDebug(
+                        "|Trailers4Jellyfin| Skipped {Count} non-English-original candidate movie(s)",
+                        beforeLanguageFilter - candidates.Count);
+                }
+            }
+
             // Fetch genre ID→name map once for sidecar metadata.
             var genreMap = await _tmdbService.GetGenreMapAsync(config.TmdbApiKey, cancellationToken).ConfigureAwait(false);
 

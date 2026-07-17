@@ -142,6 +142,16 @@
                             <div class="checkboxContainer"><label><input is="emby-checkbox" type="checkbox" id="lang-th" /><span>Thai</span></label></div>
                             <div class="checkboxContainer"><label><input is="emby-checkbox" type="checkbox" id="lang-id" /><span>Indonesian</span></label></div>
                         </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="only-english-original-movies" />
+                                <span>Only English-original movies when English is selected</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Skips foreign-language movies when TMDB marks their subtitled trailers as English.
+                            </div>
+                        </div>
                     </fieldset>
 
                     <!-- Sources -->
@@ -389,6 +399,7 @@
                         .forEach(function(code) {
                             document.getElementById('lang-' + code).checked = langs.length === 0 || langs.indexOf(code) !== -1;
                         });
+                    document.getElementById('only-english-original-movies').checked = config.OnlyEnglishOriginalMovies !== false;
                     document.getElementById('max-total-trailers').value     = config.MaxTotalTrailers ?? 50;
                     document.getElementById('delete-watched').checked       = !!config.DeleteWatchedTrailers;
                     document.getElementById('delete-library-matches').checked = !!config.DeleteTrailersForMoviesInLibrary;
@@ -426,6 +437,7 @@
                     });
                     // If all are checked treat it as "no preference" (empty string)
                     config.AllowedLanguages       = checkedLangs.length === allLangCodes.length ? '' : checkedLangs.join(',');
+                    config.OnlyEnglishOriginalMovies = document.getElementById('only-english-original-movies').checked;
                     config.MaxTotalTrailers       = parseInt(document.getElementById('max-total-trailers').value, 10) ?? 50;
                     config.DeleteWatchedTrailers  = document.getElementById('delete-watched').checked;
                     config.DeleteTrailersForMoviesInLibrary = document.getElementById('delete-library-matches').checked;

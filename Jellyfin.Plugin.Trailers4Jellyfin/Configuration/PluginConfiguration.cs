@@ -46,6 +46,9 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Configuration
         /// <summary>Comma-separated ISO 639-1 codes. Empty = all languages allowed.</summary>
         public string AllowedLanguages { get; set; } = string.Empty;
 
+        /// <summary>When English is selected, skip movies whose TMDB original language is not English.</summary>
+        public bool OnlyEnglishOriginalMovies { get; set; } = true;
+
         // ── Trailer Rotation ──────────────────────────────────────────────────
 
         /// <summary>Maximum trailers to keep on disk. Oldest are deleted first when exceeded. 0 = unlimited.</summary>
