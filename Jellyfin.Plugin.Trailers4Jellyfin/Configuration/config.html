@@ -152,6 +152,15 @@
                                 Skips foreign-language movies when TMDB marks their subtitled trailers as English.
                             </div>
                         </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="excluded-trailer-keywords">Exclude trailers with keywords</label>
+                            <input type="text" id="excluded-trailer-keywords" is="emby-input" placeholder="subtitled, teaser, telugu" />
+                            <div class="fieldDescription">
+                                Comma-separated keywords. Skips TMDB movie titles or trailer names that contain any
+                                listed keyword.
+                            </div>
+                        </div>
                     </fieldset>
 
                     <!-- Sources -->
@@ -394,6 +403,7 @@
                     document.getElementById('ytdlp-path').value             = config.YtDlpPath || '';
                     document.getElementById('ffmpeg-path').value            = config.FfmpegPath || '';
                     document.getElementById('cookies-file').value           = config.CookiesFilePath || '';
+                    document.getElementById('excluded-trailer-keywords').value = config.ExcludedTrailerKeywords || '';
                     var langs = (config.AllowedLanguages || '').split(',').map(l => l.trim()).filter(Boolean);
                     ['en','es','fr','de','it','pt','nl','ru','pl','sv','no','da','ja','ko','zh','ar','hi','tr','th','id']
                         .forEach(function(code) {
@@ -431,6 +441,7 @@
                     config.YtDlpPath              = document.getElementById('ytdlp-path').value;
                     config.FfmpegPath             = document.getElementById('ffmpeg-path').value;
                     config.CookiesFilePath        = document.getElementById('cookies-file').value;
+                    config.ExcludedTrailerKeywords = document.getElementById('excluded-trailer-keywords').value;
                     var allLangCodes =['en','es','fr','de','it','pt','nl','ru','pl','sv','no','da','ja','ko','zh','ar','hi','tr','th','id'];
                     var checkedLangs = allLangCodes.filter(function(code) {
                         return document.getElementById('lang-' + code).checked;
