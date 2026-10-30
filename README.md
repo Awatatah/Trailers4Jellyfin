@@ -37,6 +37,27 @@ The plugin selects random trailers from its download library, optionally matchin
 - If all trailers have been watched, temporarily disable **Skip watched trailers**, and set the trailer interval to 1.
 - Check server logs for `Trailers4Jellyfin`. `Queuing ... intro trailer(s)` confirms selection. `No trailer items found` means the folder/library scan needs attention. Download errors point to TMDB/YouTube or downloader configuration instead.
 
+## Trailer volume (2.1.0.0)
+
+**Adjust trailer volume** is off by default: new trailers retain their original audio (100%). Enable it and choose one of two methods:
+
+| Method | What it does | Starting point |
+|---|---|---|
+| **Lower each trailer by a set amount** | Apply the same reduction to every trailer, using either percentage or dB. Existing loudness differences remain. | **80%** of original volume; allowed range **50–90%**. Alternatively **−2 dB**, allowed range **−6 to −1 dB**. |
+| **Set all trailers to the same volume** | Measure each trailer and adjust its average loudness toward a common level. Individual scenes still vary. | **−23 LUFS**, adjustable from **−30 to −14 LUFS**. Try **−29 LUFS** for especially quiet movie files. Lower numbers mean quieter audio. |
+
+Only the selected method applies; percentage, dB reduction, and target loudness never stack. Percentage describes audio amplitude, not perceived loudness: 80% is approximately −1.94 dB, while 50% is approximately −6.02 dB. An 80% setting may be too small a reduction when trailers are much louder than movies. Normalization can also increase quiet trailers to reach the chosen target, subject to peak limits. One target cannot match every movie mix.
+
+New downloads from either downloader are processed automatically when enabled. Click **Save and reprocess current trailers** to save settings and apply them to existing `.mp4` files in the download folder. The button shows progress; you can also monitor or cancel **Scheduled Tasks → Reprocess Trailer Audio**. Downloads/cleanup and reprocessing are serialized. Avoid reprocessing during trailer playback. Scan the library afterward if a client retains old media information.
+
+Turn adjustment off and click the same button to restore originals for previously processed trailers. Turning it off alone only changes future downloads; it does not undo existing files.
+
+Both methods use **server CPU** to process audio and require extra disk space. The common-volume option uses more CPU time and takes longer because it measures each trailer before encoding. This work runs during downloads or reprocessing, not each playback; the feature does not use GPU video encoding.
+
+The plugin uses Jellyfin's FFmpeg automatically, or your explicit **ffmpeg path** override. No extra .NET libraries or separate FFmpeg installation are normally required. The chosen FFmpeg must support AAC encoding and, for normalization, the `loudnorm` filter. Two-pass normalization measures the original first, then encodes audio toward the target with a −2 dB true-peak target. Video is copied without re-encoding. Final measurements can differ slightly after AAC encoding.
+
+Unmodified originals are retained under the plugin data directory in `trailer-audio-originals`, outside the media library. This uses roughly one additional trailer file's worth of disk space per processed trailer, plus temporary working space. Reprocessing always starts from the original, so repeating it or changing methods never compounds the reduction. Do not delete these originals if you want to change or restore volume later. The plugin removes an original when its rotation task deletes the corresponding trailer or replaces it with a fresh download. Manually deleted/moved trailers can leave unused backups. Temporary output only replaces the playable file after successful processing; errors and cancellation preserve the current playable file and are reported in Scheduled Tasks/logs.
+
 ## Download quality
 
 The built-in YoutubeExplode downloader uses combined audio/video streams, generally up to 720p. yt-dlp with ffmpeg can merge separate streams for 1080p or higher. Configure executable paths if auto-detection cannot find them. A Netscape-format cookies file can be configured when YouTube requires authentication.
@@ -54,7 +75,7 @@ Install the plugin DLL and its third-party dependencies. Do not bundle Jellyfin,
 ## Releasing from a fork
 
 1. Keep `version` in `build.yaml`, `AssemblyVersion`, and `FileVersion` in the project file identical (four components). Update the changelog and `targetAbi` for the minimum supported server API. The 12.x release uses `12.0.0.0`.
-2. Push the changes to `main`, then push a matching tag, for example `v2.0.0.0`. A branch push alone does not publish a release.
+2. Push the changes to `main`, then push a matching tag, for example `v2.1.0.0`. A branch push alone does not publish a release.
 3. The **Publish Release** workflow validates versions, builds with .NET 10, packages the plugin and dependencies, computes the ZIP's MD5, and uploads the release before committing its manifest entry to `main`.
 4. Enable Actions and allow the workflow token to write repository contents. Branch protection must permit the manifest commit. If that final push fails, rerun the workflow after correcting permissions.
 5. Use your fork's raw `main/manifest.json` URL in Jellyfin. Generated release links use `GITHUB_REPOSITORY`, so they point to the fork running the workflow.
@@ -65,7 +86,7 @@ For a manual manifest update after uploading a ZIP:
 
 ```sh
 python3 -m pip install pyyaml
-python3 update_manifest.py 2.0.0.0 <zip-md5> --repository YOUR-NAME/Trailers4Jellyfin
+python3 update_manifest.py 2.1.0.0 <zip-md5> --repository YOUR-NAME/Trailers4Jellyfin
 ```
 
 ## Licence

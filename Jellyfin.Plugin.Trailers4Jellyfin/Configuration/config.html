@@ -113,6 +113,78 @@
                         </div>
                     </fieldset>
 
+                    <fieldset class="verticalSection verticalSection-extrabottompadding">
+                        <legend><h3 class="sectionTitle">Trailer Volume</h3></legend>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="enable-volume-reduction" />
+                                <span>Adjust trailer volume</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Off by default: new trailers keep 100% of their original volume.
+                                Enable to apply the selected method automatically to new downloads.
+                                Both methods use server CPU and extra disk space. Setting all trailers to the same volume
+                                takes longer because each trailer is measured first. This work happens during downloads
+                                or reprocessing, not each playback. GPU video encoding is not used.
+                            </div>
+                        </div>
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="trailer-volume-mode">Adjustment method</label>
+                            <select is="emby-select" id="trailer-volume-mode" disabled>
+                                <option value="Fixed">Lower each trailer by a set amount</option>
+                                <option value="Normalize">Set all trailers to the same volume</option>
+                            </select>
+                        </div>
+                        <div class="selectContainer" id="trailer-volume-unit-container">
+                            <label class="selectLabel" for="trailer-volume-unit">Fixed reduction unit</label>
+                            <select is="emby-select" id="trailer-volume-unit" disabled>
+                                <option value="Percentage">Percentage of original volume</option>
+                                <option value="Decibels">dB reduction</option>
+                            </select>
+                            <div class="fieldDescription">
+                                Applies the same reduction to every trailer. Differences between loud and quiet trailers remain.
+                                Pick one unit: 80% is about −1.94 dB; 50% is about −6 dB. The two units do not stack.
+                            </div>
+                        </div>
+                        <div class="inputContainer" id="trailer-volume-percent-container">
+                            <label class="inputLabel inputLabelUnfocused" for="trailer-volume">Volume kept (% of original)</label>
+                            <input type="number" id="trailer-volume" is="emby-input" min="50" max="90" step="1" required disabled />
+                            <div class="fieldDescription">
+                                Allowed: 50–90%. Default when enabled: 80%. 50% means half the original volume.
+                                Video quality is preserved; audio is re-encoded using FFmpeg.
+                            </div>
+                        </div>
+                        <div class="inputContainer" id="trailer-volume-db-container" hidden>
+                            <label class="inputLabel inputLabelUnfocused" for="trailer-volume-db">Volume reduction (dB)</label>
+                            <input type="number" id="trailer-volume-db" is="emby-input" min="-6" max="-1" step="0.1" required disabled />
+                            <div class="fieldDescription">
+                                Allowed: −6 to −1 dB (about 50–89% of original). Default: −2 dB.
+                                More negative means quieter. This is an adjustment, not a target loudness.
+                            </div>
+                        </div>
+                        <div class="inputContainer" id="trailer-target-lufs-container" hidden>
+                            <label class="inputLabel inputLabelUnfocused" for="trailer-target-lufs">Volume level (LUFS)</label>
+                            <input type="number" id="trailer-target-lufs" is="emby-input" min="-30" max="-14" step="0.1" required disabled />
+                            <div class="fieldDescription">
+                                Allowed: −30 to −14 LUFS. Start with −23 LUFS for movie playback.
+                                Adjusts each trailer to a common average volume. Lower numbers are quieter.
+                                Individual scenes will still vary in volume. Try −29 LUFS if your movies are especially quiet.
+                                Quiet trailers may become louder. The percentage or dB reduction is not applied in this mode.
+                            </div>
+                        </div>
+                        <button is="emby-button" type="button" id="reprocess-audio" class="raised">
+                            <span>Save and reprocess current trailers</span>
+                        </button>
+                        <p class="fieldDescription">
+                            Saves your settings and processes existing trailers in the background.
+                            With adjustment off, restores original volume for previously processed trailers.
+                            Originals are retained in plugin data, using extra disk space, so repeated processing
+                            never compounds the reduction. Wait until trailers are not playing.
+                            Progress and cancellation are also available under Scheduled Tasks → Reprocess Trailer Audio.
+                        </p>
+                        <p id="audio-task-status" role="status" aria-live="polite"></p>
+                    </fieldset>
+
                     <!-- Languages -->
                     <fieldset class="verticalSection verticalSection-extrabottompadding">
                         <legend><h3 class="sectionTitle">Trailer Languages</h3></legend>
@@ -379,9 +451,104 @@
         <script type="text/javascript">
             var pluginId = "7635bf62-6b22-4c4c-9bc7-5d55f0c2bff0";
 
+            var audioTaskTimer;
+            var audioTaskVisible = false;
+            var audioRequestedAt = 0;
+            var audioStarting = false;
+
+            function audioRequest(method, path) {
+                return ApiClient.ajax({ type: method, url: ApiClient.getUrl(path), dataType: method === 'GET' ? 'json' : undefined });
+            }
+
+            function refreshAudioTask() {
+                return audioRequest('GET', 'ScheduledTasks').then(function (tasks) {
+                    var task = tasks.find(function (t) { return t.Key === 'Trailers4JellyfinReprocessAudio'; });
+                    var button = document.getElementById('reprocess-audio');
+                    var status = document.getElementById('audio-task-status');
+                    if (!task) {
+                        button.disabled = true;
+                        status.textContent = 'Restart Jellyfin to register the audio processing task.';
+                        return;
+                    }
+                    var running = task.State === 'Running' || task.State === 'Cancelling';
+                    var result = task.LastExecutionResult;
+                    if (audioRequestedAt && result && Date.parse(result.StartTimeUtc) >= audioRequestedAt - 1000) audioRequestedAt = 0;
+                    button.disabled = audioStarting || running || !!audioRequestedAt;
+                    if (running) {
+                        status.textContent = 'Processing trailers: ' + Math.round(task.CurrentProgressPercentage || 0) + '% (' + task.State + ').';
+                    } else if (audioRequestedAt) {
+                        status.textContent = 'Audio processing queued. Waiting for other trailer work to finish.';
+                    } else if (result) {
+                        status.textContent = result.Status === 'Completed' ? 'Trailer audio processing completed.'
+                            : 'Last audio task: ' + result.Status + '. Check Scheduled Tasks and server logs for details.';
+                    }
+                    return task;
+                });
+            }
+
+            function pollAudioTask() {
+                refreshAudioTask().catch(function () {
+                    document.getElementById('audio-task-status').textContent = 'Could not read task status. Check Scheduled Tasks.';
+                }).finally(function () {
+                    if (audioTaskVisible) audioTaskTimer = setTimeout(pollAudioTask, 2000);
+                });
+            }
+
+            function updateVolumeControls() {
+                var enabled = document.getElementById('enable-volume-reduction').checked;
+                var normalize = document.getElementById('trailer-volume-mode').value === 'Normalize';
+                var decibels = document.getElementById('trailer-volume-unit').value === 'Decibels';
+                document.getElementById('trailer-volume-mode').disabled = !enabled;
+                document.getElementById('trailer-volume-unit').disabled = !enabled || normalize;
+                document.getElementById('trailer-volume-db').disabled = !enabled || normalize || !decibels;
+                document.getElementById('trailer-volume-db-container').hidden = normalize || !decibels;
+                document.getElementById('trailer-volume-unit-container').hidden = normalize;
+                document.getElementById('trailer-volume').disabled = !enabled || normalize || decibels;
+                document.getElementById('trailer-target-lufs').disabled = !enabled || !normalize;
+                document.getElementById('trailer-volume-percent-container').hidden = normalize || decibels;
+                document.getElementById('trailer-target-lufs-container').hidden = !normalize;
+            }
+            document.getElementById('enable-volume-reduction').addEventListener('change', updateVolumeControls);
+            document.getElementById('trailer-volume-mode').addEventListener('change', updateVolumeControls);
+            document.getElementById('trailer-volume-unit').addEventListener('change', updateVolumeControls);
+
+            document.getElementById('reprocess-audio').addEventListener('click', function () {
+                if (!document.querySelector('form.trailers4JellyfinConfigPage').reportValidity()) return;
+                var button = this;
+                if (audioStarting) return;
+                audioStarting = true;
+                button.disabled = true;
+                saveConfiguration().then(function () { return refreshAudioTask(); }).then(function (task) {
+                    if (!task || task.State === 'Running' || task.State === 'Cancelling') return;
+                    audioRequestedAt = Date.now();
+                    return audioRequest('POST', 'ScheduledTasks/Running/' + encodeURIComponent(task.Id)).then(function () {
+                        document.getElementById('audio-task-status').textContent = 'Trailer audio processing started.';
+                    });
+                }).catch(function () {
+                    audioRequestedAt = 0;
+                    button.disabled = false;
+                    document.getElementById('audio-task-status').textContent = 'Could not save settings or start processing. Please try again.';
+                }).finally(function () { audioStarting = false; Dashboard.hideLoadingMsg(); });
+            });
+
+            $('.trailers4JellyfinConfigPage').on('pagehide', function () {
+                audioTaskVisible = false;
+                clearTimeout(audioTaskTimer);
+            });
+
             $('.trailers4JellyfinConfigPage').on('pageshow', function () {
+                audioTaskVisible = true;
+                clearTimeout(audioTaskTimer);
+                pollAudioTask();
                 Dashboard.showLoadingMsg();
                 ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    document.getElementById('enable-volume-reduction').checked = !!config.EnableTrailerVolumeReduction;
+                    document.getElementById('trailer-volume').value = config.TrailerVolumePercent ?? 80;
+                    document.getElementById('trailer-volume-mode').value = config.TrailerVolumeMode === 'Normalize' ? 'Normalize' : 'Fixed';
+                    document.getElementById('trailer-volume-unit').value = config.TrailerVolumeMode === 'Decibels' ? 'Decibels' : 'Percentage';
+                    document.getElementById('trailer-volume-db').value = config.TrailerVolumeAdjustmentDb ?? -2;
+                    document.getElementById('trailer-target-lufs').value = config.TrailerTargetLufs ?? -23;
+                    updateVolumeControls();
                     document.getElementById('tmdb-api-key').value           = config.TmdbApiKey || '';
                     document.getElementById('enable-cinema-mode').checked   = config.EnableCinemaMode !== false;
                     document.getElementById('num-trailers').value           = config.NumberOfTrailers ?? 2;
@@ -417,9 +584,15 @@
                 });
             });
 
-            $('.trailers4JellyfinConfigPage').on('submit', function () {
+            function saveConfiguration() {
                 Dashboard.showLoadingMsg();
-                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                return ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    config.TrailerVolumeMode = document.getElementById('trailer-volume-mode').value === 'Normalize'
+                        ? 'Normalize' : document.getElementById('trailer-volume-unit').value;
+                    config.TrailerVolumeAdjustmentDb = Math.max(-6, Math.min(-1, parseFloat(document.getElementById('trailer-volume-db').value) || -2));
+                    config.TrailerTargetLufs = Math.max(-30, Math.min(-14, parseFloat(document.getElementById('trailer-target-lufs').value) || -23));
+                    config.EnableTrailerVolumeReduction = document.getElementById('enable-volume-reduction').checked;
+                    config.TrailerVolumePercent = Math.max(50, Math.min(90, parseInt(document.getElementById('trailer-volume').value, 10) || 80));
                     config.TmdbApiKey             = document.getElementById('tmdb-api-key').value;
                     config.EnableCinemaMode       = document.getElementById('enable-cinema-mode').checked;
                     config.NumberOfTrailers       = parseInt(document.getElementById('num-trailers').value, 10) || 2;
@@ -452,8 +625,14 @@
                     config.MaxTotalTrailers       = parseInt(document.getElementById('max-total-trailers').value, 10) ?? 50;
                     config.DeleteWatchedTrailers  = document.getElementById('delete-watched').checked;
                     config.DeleteTrailersForMoviesInLibrary = document.getElementById('delete-library-matches').checked;
-                    ApiClient.updatePluginConfiguration(pluginId, config)
-                        .then(Dashboard.processPluginConfigurationUpdateResult);
+                    return ApiClient.updatePluginConfiguration(pluginId, config);
+                });
+            }
+
+            $('form.trailers4JellyfinConfigPage').on('submit', function () {
+                saveConfiguration().then(Dashboard.processPluginConfigurationUpdateResult).catch(function () {
+                    Dashboard.hideLoadingMsg();
+                    Dashboard.alert('Could not save settings. Please try again.');
                 });
                 return false;
             });

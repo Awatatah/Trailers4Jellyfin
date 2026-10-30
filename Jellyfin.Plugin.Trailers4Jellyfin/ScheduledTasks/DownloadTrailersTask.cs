@@ -23,6 +23,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
         private readonly ILibraryManager _libraryManager;
         private readonly IUserManager _userManager;
         private readonly IUserDataManager _userDataManager;
+        private readonly TrailerAudioService _audio;
         private readonly TmdbService _tmdbService;
         private readonly TrailerDownloadService _downloadService;
 
@@ -37,7 +38,8 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
             IUserManager userManager,
             IUserDataManager userDataManager,
             TmdbService tmdbService,
-            TrailerDownloadService downloadService)
+            TrailerDownloadService downloadService,
+            TrailerAudioService audio)
         {
             _logger = logger;
             _libraryManager = libraryManager;
@@ -45,6 +47,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
             _userDataManager = userDataManager;
             _tmdbService = tmdbService;
             _downloadService = downloadService;
+            _audio = audio;
         }
 
         public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
@@ -57,6 +60,19 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
         }
 
         public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
+        {
+            await _audio.PipelineLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await DownloadAsync(progress, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _audio.PipelineLock.Release();
+            }
+        }
+
+        private async Task DownloadAsync(IProgress<double> progress, CancellationToken cancellationToken)
         {
             var config = Plugin.Instance.Configuration;
 
@@ -221,6 +237,10 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
 
                 if (success)
                 {
+                    _audio.ForgetOriginal(outputPath);
+                    await _audio.ProcessAsync(outputPath, config.EnableTrailerVolumeReduction,
+                        config.TrailerVolumePercent, config.FfmpegPath, cancellationToken,
+                        config.TrailerVolumeMode, config.TrailerTargetLufs, config.TrailerVolumeAdjustmentDb).ConfigureAwait(false);
                     downloaded++;
                     _logger.LogInformation(
                         "|Trailers4Jellyfin| [{Done}/{Max}] Saved trailer for '{Movie}' → {Path}",
@@ -360,9 +380,10 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
             }
         }
 
-        private static void DeleteTrailerFile(string trailerPath)
+        private void DeleteTrailerFile(string trailerPath)
         {
             File.Delete(trailerPath);
+            _audio.ForgetOriginal(trailerPath);
             var sidecar = Path.ChangeExtension(trailerPath, ".json");
             if (File.Exists(sidecar)) File.Delete(sidecar);
         }

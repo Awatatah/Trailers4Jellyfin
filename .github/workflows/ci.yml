@@ -27,3 +27,20 @@ jobs:
           python-version: '3.x'
       - run: python -m pip install pyyaml
       - run: python -m unittest discover -s tests -v
+
+  audio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install FFmpeg for audio integration checks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      - run: dotnet run --project tests/TrailerAudioChecks --configuration Release
+      - run: node tests/settings-checks.mjs

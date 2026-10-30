@@ -41,6 +41,33 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Configuration
         public bool SkipInProgressMovies { get; set; } = true;
         public int TrailerWatchInterval { get; set; } = 1;
 
+        public bool EnableTrailerVolumeReduction { get; set; } = false;
+
+        private int _trailerVolumePercent = 80;
+        /// <summary>Percentage of original volume retained, restricted to 50–90%.</summary>
+        public int TrailerVolumePercent
+        {
+            get => _trailerVolumePercent;
+            set => _trailerVolumePercent = System.Math.Clamp(value, 50, 90);
+        }
+
+        /// <summary>Percentage, Decibels, or Normalize; only one method applies.</summary>
+        public string TrailerVolumeMode { get; set; } = "Percentage";
+
+        private double _trailerVolumeAdjustmentDb = -2;
+        public double TrailerVolumeAdjustmentDb
+        {
+            get => _trailerVolumeAdjustmentDb;
+            set => _trailerVolumeAdjustmentDb = double.IsFinite(value) ? System.Math.Clamp(value, -6, -1) : -2;
+        }
+
+        private double _trailerTargetLufs = -23;
+        public double TrailerTargetLufs
+        {
+            get => _trailerTargetLufs;
+            set => _trailerTargetLufs = double.IsFinite(value) ? System.Math.Clamp(value, -30, -14) : -23;
+        }
+
         // ── Languages ─────────────────────────────────────────────────────────
 
         /// <summary>Comma-separated ISO 639-1 codes. Empty = all languages allowed.</summary>
