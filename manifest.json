@@ -3,7 +3,7 @@
         "category": "General",
         "guid": "7635bf62-6b22-4c4c-9bc7-5d55f0c2bff0",
         "name": "Trailers4Jellyfin",
-        "description": "Automatically downloads trailers for upcoming and recently released movies not in your library, from TMDB/YouTube. Pairs with Cinema Mode for a real cinema experience.",
+        "description": "Automatically downloads trailers for upcoming and recently released movies not in your library, from TMDB/YouTube. Includes Cinema Mode for trailers before movies. Version 2.x requires Jellyfin 12 or later; version 1.0.18.6 supports Jellyfin 10.11.",
         "overview": "Cinema-style trailers for movies you haven't seen yet",
         "owner": "Awatatah",
         "imageUrl": "https://raw.githubusercontent.com/Awatatah/Trailers4Jellyfin/main/Jellyfin.Plugin.Trailers4Jellyfin/Images/logo.svg",

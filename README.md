@@ -1,84 +1,72 @@
 # Trailers4Jellyfin
 
-A Jellyfin plugin that automatically downloads movie trailers from TMDB/YouTube and saves them locally, so Jellyfin's Cinema Mode can play them before your movies.
+Downloads trailers for upcoming and recently released movies from TMDB/YouTube and plays them before movies through the plugin's built-in Cinema Mode intro provider. No separate Cinema Mode plugin is required.
 
-## How it works
+## Compatibility
 
-1. A daily scheduled task scans every movie in your Jellyfin library.
-2. For each movie, it looks up the TMDB ID (already stored in Jellyfin's metadata, or found via a search).
-3. It fetches the official trailer(s) from TMDB, which point to YouTube.
-4. It downloads the trailer video and saves it locally.
-5. Jellyfin picks up the file as a **Local Trailer**, making it available to Cinema Mode automatically.
-
-## Requirements
-
-- Jellyfin 10.11+
-- A free [TMDB API key](https://www.themoviedb.org/settings/api)
-- *(Optional)* [yt-dlp](https://github.com/yt-dlp/yt-dlp) + [ffmpeg](https://ffmpeg.org/) for 1080p downloads
+- Plugin **2.0.0.0 and later** targets **Jellyfin Server 12.x** (including 12.2) and **.NET 10**.
+- Plugin **1.0.18.6** remains in the catalogue for Jellyfin 10.11. Do not install the 12.x build on 10.11.
+- A free [TMDB API key or Read Access Token](https://www.themoviedb.org/settings/api) is required for downloads.
+- Optional: [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [ffmpeg](https://ffmpeg.org/) for higher quality downloads and an alternative to the built-in YouTube downloader.
 
 ## Installation
 
-### Via Jellyfin Plugin Catalogue
-
-1. In your Jellyfin dashboard go to **Admin → Plugins → Repositories**.
-2. Add a new repository with this URL:
+1. In Jellyfin, open **Dashboard → Plugins → Repositories** and add:
+   ```text
+   https://raw.githubusercontent.com/Awatatah/Trailers4Jellyfin/main/manifest.json
    ```
-  https://raw.githubusercontent.com/Awatatah/Trailers4Jellyfin/main/manifest.json
-   ```
-3. Go to **Catalog**, find **Trailers4Jellyfin** under General, and click Install.
-4. Restart Jellyfin.
+2. Install or update **Trailers4Jellyfin** from the catalogue and restart Jellyfin.
+3. For a manual installation, extract **all DLLs** from the release ZIP into a dedicated folder under Jellyfin's `plugins/` directory, then restart. The plugin DLL alone is insufficient.
 
-### Manual
+## Setup and playback
 
-1. Download the latest `Jellyfin.Plugin.Trailers4Jellyfin.dll` from [Releases](../../releases).
-2. Copy it to your Jellyfin `plugins/` directory.
-3. Restart Jellyfin.
+1. Open **Dashboard → Plugins → Trailers4Jellyfin**. Set your TMDB credentials and a dedicated **Download Folder** writable by Jellyfin. In Docker, use the path visible inside the container.
+2. Add that same folder as a Jellyfin **Movies** library. Trailer files must be indexed as library items before the intro provider can play them.
+3. Choose TMDB sources (Now Playing, Upcoming, Popular, Top Rated), release date range, languages, quality, and download limits. Movies already in your library can be excluded.
+4. Run **Dashboard → Scheduled Tasks → Trailers4Jellyfin → Download TMDB Trailers**, then run a **Library Scan**. Downloads also run daily.
+5. Enable the plugin's **Cinema Mode** and set **Trailers per movie** above zero. Enable **Cinema Mode** in the playback settings of each client that supports it. The client must request intros; client support varies.
+6. Start a movie from the beginning to check playback.
 
-## Configuration
+The plugin selects random trailers from its download library, optionally matching genres. Sidecar JSON files preserve TMDB IDs and genres. It can skip trailers watched by the current user, skip resumed movies, and show trailers at a configurable per-user movie-start interval. Rotation options can delete watched trailers, trailers for movies now in your library, or the oldest trailers above the disk limit.
 
-Go to **Admin → Plugins → Trailers4Jellyfin**.
+## If trailers stop playing after a server upgrade
 
-| Setting | Description |
-|---|---|
-| **TMDB API Key** | Your TMDB v3 API key |
-| **Place trailers alongside movies** | Saves each trailer into a `trailers/` subfolder next to the movie. Jellyfin picks this up automatically. **(Recommended)** |
-| **Download Folder** | Used when the above is disabled. Point a Jellyfin Movies library here and use it as a Cinema Mode pre-roll library. |
-| **Max trailers per movie** | How many trailers to download per movie (default: 1) |
-| **Preferred video quality** | 720p (default), 480p, or 1080p (requires yt-dlp) |
-| **Skip movies with existing trailers** | Skip movies that already have a local trailer |
-| **yt-dlp path** | Full path to `yt-dlp` executable for 1080p support |
+- Check **Dashboard → Plugins** for an incompatible/failed plugin. On Jellyfin 12, install version 2.0.0.0 or later and restart the server.
+- Confirm the download folder still exists at the configured path and its Movies library contains scanned `.mp4` files. Downloads alone do not index trailers.
+- Check both the plugin and client's Cinema Mode settings. Test with a fresh movie start; resumed movies are skipped by default.
+- If all trailers have been watched, temporarily disable **Skip watched trailers**, and set the trailer interval to 1.
+- Check server logs for `Trailers4Jellyfin`. `Queuing ... intro trailer(s)` confirms selection. `No trailer items found` means the folder/library scan needs attention. Download errors point to TMDB/YouTube or downloader configuration instead.
 
-## Running the task
+## Download quality
 
-After configuring, go to **Admin → Scheduled Tasks → Trailers4Jellyfin** and click **Run** to do an immediate download pass. The task will then run automatically once per day.
-
-After the task completes, trigger a **Library Scan** so Jellyfin indexes the new trailer files.
-
-## Quality notes
-
-| Mode | Max quality | Requirements |
-|---|---|---|
-| Built-in (YoutubeExplode) | 720p | None |
-| yt-dlp | 1080p+ | yt-dlp + ffmpeg on PATH |
-
-The built-in downloader uses [YoutubeExplode](https://github.com/Tyrrrz/YoutubeExplode) and requires no external tools. For 1080p, YouTube delivers video and audio as separate streams that must be merged — yt-dlp handles this automatically when ffmpeg is available.
-
-## Using with Cinema Mode
-
-This plugin works with Jellyfin's built-in Cinema Mode setting.
-
-- **Alongside movies mode**: Trailers are saved as Local Trailers. Cinema Mode picks them up automatically via Jellyfin's trailer selection.
-- **Dedicated folder mode**: Create a Jellyfin Movies library pointing at the download folder, then set it as the Trailer Pre-Roll Library in the Cinema Mode plugin config.
+The built-in YoutubeExplode downloader uses combined audio/video streams, generally up to 720p. yt-dlp with ffmpeg can merge separate streams for 1080p or higher. Configure executable paths if auto-detection cannot find them. A Netscape-format cookies file can be configured when YouTube requires authentication.
 
 ## Building from source
 
+Install the .NET 10 SDK, then run:
+
 ```sh
-git clone https://github.com/Awatatah/Trailers4Jellyfin
-cd Trailers4Jellyfin
-dotnet publish --configuration Release --output bin
+dotnet publish Jellyfin.Plugin.Trailers4Jellyfin/Jellyfin.Plugin.Trailers4Jellyfin.csproj --configuration Release --output bin
 ```
 
-Place `Jellyfin.Plugin.Trailers4Jellyfin.dll` and its dependencies in your Jellyfin `plugins/` directory.
+Install the plugin DLL and its third-party dependencies. Do not bundle Jellyfin, MediaBrowser, Microsoft, or System framework DLLs from the build output; the server supplies them.
+
+## Releasing from a fork
+
+1. Keep `version` in `build.yaml`, `AssemblyVersion`, and `FileVersion` in the project file identical (four components). Update the changelog and `targetAbi` for the minimum supported server API. The 12.x release uses `12.0.0.0`.
+2. Push the changes to `main`, then push a matching tag, for example `v2.0.0.0`. A branch push alone does not publish a release.
+3. The **Publish Release** workflow validates versions, builds with .NET 10, packages the plugin and dependencies, computes the ZIP's MD5, and uploads the release before committing its manifest entry to `main`.
+4. Enable Actions and allow the workflow token to write repository contents. Branch protection must permit the manifest commit. If that final push fails, rerun the workflow after correcting permissions.
+5. Use your fork's raw `main/manifest.json` URL in Jellyfin. Generated release links use `GITHUB_REPOSITORY`, so they point to the fork running the workflow.
+
+`update_manifest.py` reads the release's `build.yaml`, preserves older releases, and sorts versions newest first. The workflow saves the tagged metadata before switching to the latest `main`, so later changes cannot alter the ABI/changelog of the artifact being released. Do not add a placeholder checksum or catalogue entry before a real release ZIP exists.
+
+For a manual manifest update after uploading a ZIP:
+
+```sh
+python3 -m pip install pyyaml
+python3 update_manifest.py 2.0.0.0 <zip-md5> --repository YOUR-NAME/Trailers4Jellyfin
+```
 
 ## Licence
 

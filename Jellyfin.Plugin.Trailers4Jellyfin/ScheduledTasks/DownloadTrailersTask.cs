@@ -269,23 +269,6 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
             return ids;
         }
 
-        // GetUsers() replaced the Users property in Jellyfin 10.11.10. Try both via reflection
-        // so the plugin works across patch versions without recompiling.
-        private IList<User> GetAllUsers()
-        {
-            var type = _userManager.GetType();
-
-            var method = type.GetMethod("GetUsers", Type.EmptyTypes);
-            if (method != null)
-                return ((IEnumerable<User>)method.Invoke(_userManager, null)!).ToList();
-
-            var prop = type.GetProperty("Users");
-            if (prop != null)
-                return ((IEnumerable<User>)prop.GetValue(_userManager)!).ToList();
-
-            throw new MissingMethodException("Neither GetUsers() nor Users found on IUserManager.");
-        }
-
         private void CleanupTrailers(Configuration.PluginConfiguration config)
         {
             var downloadFolder = config.DownloadFolder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
@@ -322,12 +305,11 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
             {
                 try
                 {
-                    // Users property was replaced with GetUsers() in Jellyfin 10.11.10+.
-                    var users = GetAllUsers();
+                    var users = _userManager.GetUsers().ToList();
                     foreach (var file in files.ToList())
                     {
                         if (!trailerItemsByPath.TryGetValue(file, out var item)) continue;
-                        bool watched = users.Any(u => _userDataManager.GetUserData(u, item).Played);
+                        bool watched = users.Any(u => _userDataManager.GetUserData(u, item)?.Played == true);
                         if (!watched) continue;
 
                         _logger.LogInformation("|Trailers4Jellyfin| Deleting watched trailer: {File}", Path.GetFileName(file));
