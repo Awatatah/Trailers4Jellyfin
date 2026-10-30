@@ -20,14 +20,34 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Setup .NET 9
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Get version from tag
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release metadata
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          pip install pyyaml --quiet
+          python3 - <<'PYTHON'
+          import os
+          import xml.etree.ElementTree as ET
+          import yaml
+          with open("build.yaml") as f:
+              build = yaml.safe_load(f)
+          project = ET.parse("Jellyfin.Plugin.Trailers4Jellyfin/Jellyfin.Plugin.Trailers4Jellyfin.csproj")
+          version = os.environ["RELEASE_VERSION"]
+          assert version == str(build["version"]), "Tag and build.yaml version differ"
+          for field in ("AssemblyVersion", "FileVersion"):
+              assert project.findtext(f".//{field}") == version, f"{field} differs from tag"
+          PYTHON
+          cp build.yaml "$RUNNER_TEMP/trailers4jellyfin-build.yaml"
+          cp update_manifest.py "$RUNNER_TEMP/trailers4jellyfin-update-manifest.py"
 
       - name: Build
         run: |
@@ -56,28 +76,32 @@ jobs:
           VERSION="${{ steps.version.outputs.VERSION }}"
           echo "MD5=$(md5sum trailers4jellyfin_${VERSION}.zip | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
-      - name: Update manifest.json and commit to main
-        run: |
-          pip install pyyaml --quiet
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Switch to the latest main before updating the manifest so there is no
-          # rebase conflict when another commit landed on main since the tag was pushed.
-          git fetch origin main
-          git checkout main
-          python3 update_manifest.py "${{ steps.version.outputs.VERSION }}" "${{ steps.checksum.outputs.MD5 }}"
-          git add manifest.json
-          git commit -m "chore: update manifest.json for v${{ steps.version.outputs.VERSION }}" || echo "No changes to commit"
-          git push origin main
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body: |
-            See [CHANGELOG](https://github.com/Awatatah/Trailers4Jellyfin/blob/main/build.yaml) for details.
+            See [CHANGELOG](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/build.yaml) for details.
 
-            **To install:** Add `https://raw.githubusercontent.com/Awatatah/Trailers4Jellyfin/main/manifest.json`
+            **To install:** Add `https://raw.githubusercontent.com/${{ github.repository }}/main/manifest.json`
             as a plugin repository in Jellyfin → Admin → Plugins → Repositories.
           files: trailers4jellyfin_${{ steps.version.outputs.VERSION }}.zip
+
+      - name: Update manifest.json and commit to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Switch to the latest main before updating the manifest so there is no
+          # rebase conflict when another commit landed on main since the tag was pushed.
+          git fetch origin main
+          git checkout main
+          python3 "$RUNNER_TEMP/trailers4jellyfin-update-manifest.py" \
+            "${{ steps.version.outputs.VERSION }}" "${{ steps.checksum.outputs.MD5 }}" \
+            --build-file "$RUNNER_TEMP/trailers4jellyfin-build.yaml" \
+            --repository "$GITHUB_REPOSITORY"
+          git add manifest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update manifest.json for v${{ steps.version.outputs.VERSION }}"
+          fi
+          git push origin main

@@ -6,3 +6,4 @@ obj/
 *.suo
 *.swp
 .claude/
+__pycache__/
