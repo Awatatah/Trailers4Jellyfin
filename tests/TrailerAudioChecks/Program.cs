@@ -42,6 +42,7 @@ try
     var config = new PluginConfiguration();
     Check(!config.EnableTrailerVolumeReduction && config.TrailerVolumePercent == 80,
         "Default is unchanged audio; enabling starts at 80%");
+    Check(config.KeepOriginalTrailers, "Original retention defaults to on for existing configurations");
     config.TrailerVolumePercent = 40;
     Check(config.TrailerVolumePercent == 50, "Server clamps values below 50%");
     config.TrailerVolumePercent = 100;
@@ -163,6 +164,97 @@ try
     Check(Hash(file) == originalHash, "Disabling and reprocessing restores original bytes");
     service.ForgetOriginal(file);
     Check(!Directory.GetFiles(originals).Any(), "Trailer cleanup removes its original backup");
+    using (var missingDownloader = new TrailerDownloadService(NullLogger<TrailerDownloadService>.Instance, () => null))
+    {
+        var missingOutput = Path.Combine(root, "missing-1080.mp4");
+        try
+        {
+            await missingDownloader.DownloadAsync("test-key", missingOutput, 1080, "/missing/yt-dlp", "", "", CancellationToken.None);
+            throw new Exception("1080p silently fell back to the built-in downloader");
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("1080p downloads require yt-dlp")) { }
+        Check(!File.Exists(missingOutput), "Missing yt-dlp produces an explicit 1080p setup error without a low-quality fallback");
+    }
+    var retentionFolder = Path.Combine(root, "retained-originals");
+    var retention = new TrailerAudioService(NullLogger<TrailerAudioService>.Instance, encoder, retentionFolder);
+    var noEncoder = new TrailerAudioService(NullLogger<TrailerAudioService>.Instance, "/missing/ffmpeg", retentionFolder);
+    var retainedFile = Path.Combine(root, "retention-test.mp4");
+    File.Copy(file, retainedFile);
+    await retention.ProcessAsync(retainedFile, true, 80, "", CancellationToken.None);
+    var retainedHash = Hash(retainedFile);
+    try
+    {
+        await noEncoder.ProcessAsync(retainedFile, true, 50, "", CancellationToken.None, keepOriginal: false);
+        throw new Exception("Failed processing unexpectedly succeeded");
+    }
+    catch (System.ComponentModel.Win32Exception) { }
+    Check(Hash(retainedFile) == retainedHash && Directory.GetFiles(retentionFolder).Length == 1,
+        "Processing failure with retention off keeps both the current trailer and saved original");
+    await noEncoder.ProcessAsync(retainedFile, true, 80, "", CancellationToken.None, keepOriginal: false);
+    Check(Hash(retainedFile) == retainedHash && !Directory.GetFiles(retentionFolder).Any(),
+        "Turning retention off deletes only the backup when settings match, without invoking FFmpeg");
+    // Recreate the service to prove history survives server restarts.
+    var restarted = new TrailerAudioService(NullLogger<TrailerAudioService>.Instance, "/missing/ffmpeg", retentionFolder);
+    await restarted.ProcessAsync(retainedFile, true, 80, "", CancellationToken.None, keepOriginal: false);
+    Check(Hash(retainedFile) == retainedHash, "Repeat processing without an original is a no-op after restart");
+    await restarted.ProcessAsync(retainedFile, false, 80, "", CancellationToken.None, keepOriginal: false);
+    Check(Hash(retainedFile) == retainedHash, "Disabling adjustment cannot restore a discarded original");
+    await restarted.ProcessAsync(retainedFile, true, 80, "", CancellationToken.None, keepOriginal: true);
+    Check(!Directory.GetFiles(retentionFolder).Any(), "Re-enabling retention does not save adjusted audio as a fake original");
+    try
+    {
+        await retention.ProcessAsync(retainedFile, true, 50, "", CancellationToken.None, keepOriginal: false);
+        throw new Exception("Changed settings were applied without an original");
+    }
+    catch (IOException ex) when (ex.Message.Contains("Download the trailer again")) { }
+    Check(Hash(retainedFile) == retainedHash, "Changing settings without an original requires a fresh download");
+    retention.ForgetOriginal(retainedFile);
+    File.Copy(file, retainedFile, overwrite: true);
+    await retention.ProcessAsync(retainedFile, true, 80, "", CancellationToken.None, keepOriginal: false);
+    Check(!Directory.GetFiles(retentionFolder).Any() && Hash(retainedFile) != originalHash,
+        "Fresh downloads with retention off are processed without creating an original backup");
+    var freshHash = Hash(retainedFile);
+    var history = Directory.GetFiles(retentionFolder + "-state").Single();
+    File.WriteAllText(history, "invalid json");
+    try
+    {
+        await retention.ProcessAsync(retainedFile, true, 80, "", CancellationToken.None, keepOriginal: false);
+        throw new Exception("Corrupt history was ignored without an original");
+    }
+    catch (IOException ex) when (ex.Message.Contains("history is unreadable")) { }
+    Check(Hash(retainedFile) == freshHash, "Corrupt processing history fails safely instead of compounding reduction");
+    retention.ForgetOriginal(retainedFile);
+    Check(!Directory.GetFiles(retentionFolder + "-state").Any(), "Fresh-download reset and cleanup remove processing history");
+
+    foreach (var mode in new[] { "Percentage", "Normalize" })
+    {
+        var legacyFolder = Path.Combine(root, "legacy-" + mode);
+        var legacy = new TrailerAudioService(NullLogger<TrailerAudioService>.Instance, encoder, legacyFolder);
+        var legacyFile = Path.Combine(root, "legacy-" + mode + ".mp4");
+        File.Copy(file, legacyFile);
+        await legacy.ProcessAsync(legacyFile, true, 80, "", CancellationToken.None, mode, -29);
+        var legacyHash = Hash(legacyFile);
+        Directory.Delete(legacyFolder + "-state", recursive: true); // Simulate a 2.1 processed trailer.
+        await legacy.ProcessAsync(legacyFile, true, 80, "", CancellationToken.None, mode, -29, keepOriginal: false);
+        Check(Hash(legacyFile) == legacyHash && !Directory.GetFiles(legacyFolder).Any(),
+            $"Legacy 2.1 {mode} processing is detected: backup removed and adjusted bytes unchanged");
+    }
+    var changedFolder = Path.Combine(root, "changed-originals");
+    var changed = new TrailerAudioService(NullLogger<TrailerAudioService>.Instance, encoder, changedFolder);
+    var changedFile = Path.Combine(root, "changed-settings.mp4");
+    File.Copy(file, changedFile);
+    await changed.ProcessAsync(changedFile, true, 80, "", CancellationToken.None);
+    await changed.ProcessAsync(changedFile, true, 50, "", CancellationToken.None, keepOriginal: false);
+    Check(Math.Abs((await Mean(changedFile) - originalMean) - 20 * Math.Log10(0.5)) < 0.25
+        && !Directory.GetFiles(changedFolder).Any(),
+        "Changed settings use the saved original before discarding it after success");
+    var restoreFile = Path.Combine(root, "restore-and-discard.mp4");
+    File.Copy(file, restoreFile);
+    await changed.ProcessAsync(restoreFile, true, 80, "", CancellationToken.None);
+    await changed.ProcessAsync(restoreFile, false, 80, "", CancellationToken.None, keepOriginal: false);
+    Check(Hash(restoreFile) == originalHash && !Directory.GetFiles(changedFolder).Any(),
+        "Turning adjustment off restores available original audio before deleting its backup");
+
     var sample = Environment.GetEnvironmentVariable("T4J_SAMPLE_TRAILER");
     if (!string.IsNullOrWhiteSpace(sample))
     {

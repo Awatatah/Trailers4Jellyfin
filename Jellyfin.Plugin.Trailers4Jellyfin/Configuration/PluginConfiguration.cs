@@ -43,6 +43,8 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Configuration
 
         public bool EnableTrailerVolumeReduction { get; set; } = false;
 
+        public bool KeepOriginalTrailers { get; set; } = true;
+
         private int _trailerVolumePercent = 80;
         /// <summary>Percentage of original volume retained, restricted to 50–90%.</summary>
         public int TrailerVolumePercent

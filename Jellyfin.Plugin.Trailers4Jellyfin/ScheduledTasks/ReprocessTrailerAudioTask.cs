@@ -34,6 +34,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
                 if (string.IsNullOrWhiteSpace(config.DownloadFolder) || !Directory.Exists(config.DownloadFolder))
                     throw new DirectoryNotFoundException("Configure an existing trailer download folder before reprocessing.");
                 var enabled = config.EnableTrailerVolumeReduction;
+                var keepOriginal = config.KeepOriginalTrailers;
                 var volume = config.TrailerVolumePercent;
                 var encoder = config.FfmpegPath;
                 var mode = config.TrailerVolumeMode;
@@ -49,7 +50,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
                     cancellationToken.ThrowIfCancellationRequested();
                     try
                     {
-                        await _audio.ProcessAsync(files[i], enabled, volume, encoder, cancellationToken, mode, targetLufs, adjustmentDb).ConfigureAwait(false);
+                        await _audio.ProcessAsync(files[i], enabled, volume, encoder, cancellationToken, mode, targetLufs, adjustmentDb, keepOriginal).ConfigureAwait(false);
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {

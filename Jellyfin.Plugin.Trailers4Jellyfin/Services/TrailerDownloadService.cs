@@ -19,11 +19,13 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
     {
         private readonly ILogger<TrailerDownloadService> _logger;
         private readonly HttpClient _httpClient;
+        private readonly Func<string?> _findYtDlp;
         private readonly CookieInjectingHandler _cookieHandler;
 
-        public TrailerDownloadService(ILogger<TrailerDownloadService> logger)
+        public TrailerDownloadService(ILogger<TrailerDownloadService> logger, Func<string?>? findYtDlp = null)
         {
             _logger = logger;
+            _findYtDlp = findYtDlp ?? FindYtDlp;
 
             // Force IPv4 to avoid ~80s delay when IPv6 is unreachable (Happy Eyeballs fallback).
             // UseCookies = false because CookieInjectingHandler injects the Cookie header directly.
@@ -72,7 +74,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
 
             var resolvedYtDlp = !string.IsNullOrWhiteSpace(ytDlpPath) && File.Exists(ytDlpPath)
                 ? ytDlpPath
-                : FindYtDlp();
+                : _findYtDlp();
 
             if (resolvedYtDlp != null)
             {
@@ -81,6 +83,14 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
 
                 return await DownloadWithYtDlpAsync(youtubeKey, outputPath, preferredHeight, resolvedYtDlp, cookiesFilePath, ffmpegPath, ct)
                     .ConfigureAwait(false);
+            }
+
+            if (preferredHeight > 720)
+            {
+                throw new InvalidOperationException(
+                    $"{preferredHeight}p downloads require yt-dlp, but it was not found. " +
+                    $"Check the configured yt-dlp path '{ytDlpPath}' inside the Jellyfin server environment. " +
+                    "Download stopped instead of silently falling back to lower-quality built-in streams.");
             }
 
             _logger.LogWarning(
