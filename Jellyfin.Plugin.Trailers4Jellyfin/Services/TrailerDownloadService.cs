@@ -229,11 +229,24 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.Services
                 };
 
                 process.Start();
-                await process.WaitForExitAsync(ct).ConfigureAwait(false);
-
+                var stdoutTask = process.StandardOutput.ReadToEndAsync();
+                var stderrTask = process.StandardError.ReadToEndAsync();
+                try
+                {
+                    await process.WaitForExitAsync(ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Stop all writers before the download task releases the shared audio-processing lock.
+                    if (!process.HasExited) process.Kill(entireProcessTree: true);
+                    await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+                    await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
+                    throw;
+                }
+                await stdoutTask.ConfigureAwait(false);
+                var stderr = await stderrTask.ConfigureAwait(false);
                 if (process.ExitCode != 0)
                 {
-                    var stderr = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
                     _logger.LogError("|Trailers4Jellyfin| yt-dlp exited with code {Code} for {Key}: {Error}",
                         process.ExitCode, key, stderr);
                     return false;
