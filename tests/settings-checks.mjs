@@ -40,6 +40,7 @@ const submit = async () => { handlers['form.trailers4JellyfinConfigPage:submit']
 handlers['.trailers4JellyfinConfigPage:pageshow']();
 await settle();
 assert.equal(get('enable-volume-reduction').checked, false);
+assert.equal(get('keep-original-trailers').checked, true);
 assert.equal(get('trailer-volume').value, 80);
 assert.equal(get('trailer-volume').disabled, true);
 assert.equal(get('trailer-target-lufs').disabled, true);
@@ -53,6 +54,13 @@ assert.equal(saved.EnableTrailerVolumeReduction, true);
 assert.equal(saved.TrailerVolumeMode, 'Percentage');
 assert.equal(saved.TrailerVolumePercent, 80);
 console.log('PASS: Percentage route saves independently');
+const postsBeforeSave = requests.filter(r => r.type === 'POST').length;
+get('keep-original-trailers').checked = false;
+await submit();
+assert.equal(saved.KeepOriginalTrailers, false);
+assert.equal(requests.filter(r => r.type === 'POST').length, postsBeforeSave);
+console.log('PASS: Retention toggle saves without starting processing or deleting existing originals');
+
 get('trailer-volume-unit').value = 'Decibels';
 change('trailer-volume-unit');
 assert.equal(get('trailer-volume').disabled, true);
@@ -100,4 +108,6 @@ assert.equal(context.audioTaskVisible, false);
 assert.match(html, /id="trailer-volume"[^>]*min="50" max="90"/);
 assert.match(html, /Set all trailers to the same volume/);
 assert.match(html, /Both methods use server CPU and extra disk space/);
+assert.match(html, /cannot restore its audio/);
+assert.match(html, /Save alone does not process trailers or delete existing originals/);
 console.log('PASS: Percentage bounds and plain-language guidance are present');

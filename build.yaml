@@ -1,5 +1,5 @@
 ---
-version: 2.1.0.0
+version: 2.2.0.0
 name: Trailers4Jellyfin
 guid: 7635bf62-6b22-4c4c-9bc7-5d55f0c2bff0
 description: >
@@ -11,10 +11,11 @@ category: General
 owner: Awatatah
 targetAbi: 12.0.0.0
 changelog:
-  - Add optional trailer volume adjustment with percentage or dB reduction, or a common loudness target
-  - Automatically process new downloads and add a settings button to reprocess existing trailers
-  - Preserve originals for repeat processing and restoration without cumulative audio reduction
-  - Show background processing progress and serialize audio processing with downloads and cleanup
+  - Stop 1080p downloads with a clear error when yt-dlp is missing instead of silently downloading lower quality
+  - Add an option to keep or discard original trailers after audio processing, enabled by default
+  - Skip encoding trailers already matching the saved volume settings; remove only their backups when requested
+  - Track processing settings and file fingerprints to prevent repeated reduction without an original
+  - Explain irreversible backup deletion and when downloading trailers again is required
 
 dotnetProjects:
   - name: Jellyfin.Plugin.Trailers4Jellyfin

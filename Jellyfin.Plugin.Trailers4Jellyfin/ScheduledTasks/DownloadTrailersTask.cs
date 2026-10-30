@@ -240,7 +240,7 @@ namespace Jellyfin.Plugin.Trailers4Jellyfin.ScheduledTasks
                     _audio.ForgetOriginal(outputPath);
                     await _audio.ProcessAsync(outputPath, config.EnableTrailerVolumeReduction,
                         config.TrailerVolumePercent, config.FfmpegPath, cancellationToken,
-                        config.TrailerVolumeMode, config.TrailerTargetLufs, config.TrailerVolumeAdjustmentDb).ConfigureAwait(false);
+                        config.TrailerVolumeMode, config.TrailerTargetLufs, config.TrailerVolumeAdjustmentDb, config.KeepOriginalTrailers).ConfigureAwait(false);
                     downloaded++;
                     _logger.LogInformation(
                         "|Trailers4Jellyfin| [{Done}/{Max}] Saved trailer for '{Movie}' → {Path}",

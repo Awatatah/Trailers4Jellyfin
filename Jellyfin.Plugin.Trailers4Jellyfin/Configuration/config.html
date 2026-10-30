@@ -172,14 +172,29 @@
                                 Quiet trailers may become louder. The percentage or dB reduction is not applied in this mode.
                             </div>
                         </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="keep-original-trailers" />
+                                <span>Keep original trailers</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                On by default. Keeps an untouched copy so you can change or restore volume later, using extra disk space.
+                                Turn off to keep only the adjusted trailer. Once an original is deleted, turning volume adjustment off
+                                cannot restore its audio; download the trailer again to restore it or change its settings.
+                                Turning this option back on cannot recover discarded originals.
+                                Save affects future processing only. Save and reprocess removes existing originals after each trailer
+                                is successfully processed; trailers already matching the settings are left unchanged and only their originals are deleted.
+                            </div>
+                        </div>
                         <button is="emby-button" type="button" id="reprocess-audio" class="raised">
                             <span>Save and reprocess current trailers</span>
                         </button>
                         <p class="fieldDescription">
                             Saves your settings and processes existing trailers in the background.
-                            With adjustment off, restores original volume for previously processed trailers.
-                            Originals are retained in plugin data, using extra disk space, so repeated processing
-                            never compounds the reduction. Wait until trailers are not playing.
+                            With adjustment off, restores original volume only where a saved original is available.
+                            Already processed trailers are skipped when their settings match, avoiding repeated volume reduction.
+                            Without an original, changing settings requires downloading that trailer again.
+                            Save alone does not process trailers or delete existing originals. Wait until trailers are not playing.
                             Progress and cancellation are also available under Scheduled Tasks → Reprocess Trailer Audio.
                         </p>
                         <p id="audio-task-status" role="status" aria-live="polite"></p>
@@ -336,8 +351,14 @@
                             <select is="emby-select" id="video-quality" class="emby-select-withcolor emby-select">
                                 <option value="720">720p (built-in, no extra tools)</option>
                                 <option value="480">480p (built-in, no extra tools)</option>
-                                <option value="1080">1080p (requires yt-dlp + ffmpeg)</option>
+                                <option value="1080">Up to 1080p (requires yt-dlp + ffmpeg)</option>
                             </select>
+                            <div class="fieldDescription">
+                                Downloads the best available quality up to this limit; the source may offer less.
+                                1080p requires a working yt-dlp path and FFmpeg. Missing yt-dlp stops 1080p downloads
+                                instead of silently using the lower-quality built-in downloader.
+                                Existing trailers are not upgraded when Skip trailers already downloaded is enabled.
+                            </div>
                         </div>
 
                         <div class="checkboxContainer checkboxContainer-withDescription">
@@ -542,6 +563,7 @@
                 pollAudioTask();
                 Dashboard.showLoadingMsg();
                 ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    document.getElementById('keep-original-trailers').checked = config.KeepOriginalTrailers !== false;
                     document.getElementById('enable-volume-reduction').checked = !!config.EnableTrailerVolumeReduction;
                     document.getElementById('trailer-volume').value = config.TrailerVolumePercent ?? 80;
                     document.getElementById('trailer-volume-mode').value = config.TrailerVolumeMode === 'Normalize' ? 'Normalize' : 'Fixed';
@@ -591,6 +613,7 @@
                         ? 'Normalize' : document.getElementById('trailer-volume-unit').value;
                     config.TrailerVolumeAdjustmentDb = Math.max(-6, Math.min(-1, parseFloat(document.getElementById('trailer-volume-db').value) || -2));
                     config.TrailerTargetLufs = Math.max(-30, Math.min(-14, parseFloat(document.getElementById('trailer-target-lufs').value) || -23));
+                    config.KeepOriginalTrailers = document.getElementById('keep-original-trailers').checked;
                     config.EnableTrailerVolumeReduction = document.getElementById('enable-volume-reduction').checked;
                     config.TrailerVolumePercent = Math.max(50, Math.min(90, parseInt(document.getElementById('trailer-volume').value, 10) || 80));
                     config.TmdbApiKey             = document.getElementById('tmdb-api-key').value;
