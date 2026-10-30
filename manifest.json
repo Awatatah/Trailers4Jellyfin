@@ -9,6 +9,14 @@
         "imageUrl": "https://raw.githubusercontent.com/Awatatah/Trailers4Jellyfin/main/Jellyfin.Plugin.Trailers4Jellyfin/Images/logo.svg",
         "versions": [
             {
+                "checksum": "9adb1060d6abd754b0cd2d481bfd562e",
+                "changelog": "- Stop 1080p downloads with a clear error when yt-dlp is missing instead of silently downloading lower quality\n- Add an option to keep or discard original trailers after audio processing, enabled by default\n- Skip encoding trailers already matching the saved volume settings; remove only their backups when requested\n- Track processing settings and file fingerprints to prevent repeated reduction without an original\n- Explain irreversible backup deletion and when downloading trailers again is required\n",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/Awatatah/Trailers4Jellyfin/releases/download/v2.2.0.0/trailers4jellyfin_2.2.0.0.zip",
+                "timestamp": "2026-10-30T02:24:25Z",
+                "version": "2.2.0.0"
+            },
+            {
                 "checksum": "a0811e6581d2db2ecea3eac44156c1ed",
                 "changelog": "- Add optional trailer volume adjustment with percentage or dB reduction, or a common loudness target\n- Automatically process new downloads and add a settings button to reprocess existing trailers\n- Preserve originals for repeat processing and restoration without cumulative audio reduction\n- Show background processing progress and serialize audio processing with downloads and cleanup\n",
                 "targetAbi": "12.0.0.0",
