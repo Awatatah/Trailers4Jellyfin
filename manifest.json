@@ -9,6 +9,14 @@
         "imageUrl": "https://raw.githubusercontent.com/Awatatah/Trailers4Jellyfin/main/Jellyfin.Plugin.Trailers4Jellyfin/Images/logo.svg",
         "versions": [
             {
+                "checksum": "590383c8b206a898a07865f44854191f",
+                "changelog": "- Major release requiring Jellyfin 12 or later; Jellyfin 10.11 users should remain on 1.0.18.6\n- Rebuild against Jellyfin 12 APIs and .NET 10 for Jellyfin 12.x\n- Exclude server runtime dependencies from the plugin package\n- Correct Cinema Mode setup documentation and release manifest generation\n",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/Awatatah/Trailers4Jellyfin/releases/download/v2.0.0.0/trailers4jellyfin_2.0.0.0.zip",
+                "timestamp": "2026-10-30T01:03:19Z",
+                "version": "2.0.0.0"
+            },
+            {
                 "checksum": "7bfd89b8806a583755fb4f5f5e9017c2",
                 "changelog": "- Check TMDB movie keywords when applying trailer keyword exclusions\n- Clarify keyword exclusions apply to movie titles, trailer names, and TMDB keywords\n",
                 "targetAbi": "10.11.0.0",
